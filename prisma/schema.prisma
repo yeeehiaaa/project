@@ -7,9 +7,364 @@ datasource db {
   provider = "postgresql"
 }
 
-// ======================================================
-// ENUMS
-// ======================================================
+model Profile {
+  id                String           @id @default(uuid())
+  authUserId        String           @unique
+  userType          UserType
+  email             String           @unique
+  firstName         String
+  lastName          String
+  nationalId        String?          @unique
+  gender            Gender?
+  birthDate         DateTime?
+  preferredLanguage String           @default("fr")
+  phone             String?
+  avatarUrl         String?
+  address           String?
+  city              String?
+  wilaya            String?
+  postalCode        String?
+  latitude          Decimal?         @db.Decimal(10, 7)
+  longitude         Decimal?         @db.Decimal(10, 7)
+  isVerified        Boolean          @default(false)
+  accountStatus     AccountStatus    @default(PENDING)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  admin             Admin?
+  doctor            Doctor?
+  laboratoryStaff   LaboratoryStaff?
+  patient           Patient?
+  pharmacist        Pharmacist?
+
+  @@index([userType])
+  @@index([city])
+  @@index([wilaya])
+}
+
+model HealthcareFacility {
+  id                 String               @id @default(uuid())
+  name               String
+  type               FacilityType
+  registrationNumber String?              @unique
+  description        String?
+  phone              String?
+  email              String?
+  website            String?
+  address            String?
+  city               String?
+  wilaya             String?
+  postalCode         String?
+  latitude           Decimal?             @db.Decimal(10, 7)
+  longitude          Decimal?             @db.Decimal(10, 7)
+  openingHours       Json?
+  emergencyService   Boolean              @default(false)
+  isVerified         Boolean              @default(false)
+  logoUrl            String?
+  coverImageUrl      String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  doctors            DoctorFacility[]
+  laboratoryStaff    LaboratoryFacility[]
+  pharmacists        PharmacistFacility[]
+
+  @@index([type])
+  @@index([city])
+  @@index([wilaya])
+}
+
+model Specialty {
+  id          String            @id @default(uuid())
+  name        String            @unique
+  description String?
+  createdAt   DateTime          @default(now())
+  doctors     DoctorSpecialty[]
+}
+
+model Doctor {
+  id                     String            @id @default(uuid())
+  profileId              String            @unique
+  licenseNumber          String            @unique
+  nationalRegistration   String?           @unique
+  biography              String?
+  yearsExperience        Int?
+  consultationLanguages  String?
+  education              String?
+  certifications         String?
+  consultationFee        Decimal?          @db.Decimal(10, 2)
+  consultationDuration   Int?
+  acceptsOnline          Boolean           @default(false)
+  acceptsHomeVisit       Boolean           @default(false)
+  isAcceptingNewPatients Boolean           @default(true)
+  averageRating          Decimal           @default(0) @db.Decimal(3, 2)
+  totalReviews           Int               @default(0)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  appointments           Appointment[]
+  profile                Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  facilities             DoctorFacility[]
+  specialties            DoctorSpecialty[]
+  medicalRecords         MedicalRecord[]
+  prescriptions          Prescription[]
+}
+
+model DoctorSpecialty {
+  doctorId    String
+  specialtyId String
+  doctor      Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  specialty   Specialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+
+  @@id([doctorId, specialtyId])
+}
+
+model DoctorFacility {
+  doctorId   String
+  facilityId String
+  doctor     Doctor             @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  facility   HealthcareFacility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@id([doctorId, facilityId])
+}
+
+model Patient {
+  id                       String             @id @default(uuid())
+  profileId                String             @unique
+  emergencyContactName     String?
+  emergencyContactPhone    String?
+  emergencyContactRelation String?
+  guardianFirstName        String?
+  guardianLastName         String?
+  guardianEmail            String?
+  guardianPhone            String?
+  guardianRelation         String?
+  bloodType                String?
+  allergies                String?
+  chronicConditions        String?
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+  conversations            AIConversation[]
+  appointments             Appointment[]
+  laboratoryResults        LaboratoryResult[]
+  medicalRecords           MedicalRecord[]
+  profile                  Profile            @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  prescriptions            Prescription[]
+  refillRequests           RefillRequest[]
+  vaccinations             Vaccination[]
+}
+
+model Pharmacist {
+  id            String               @id @default(uuid())
+  profileId     String               @unique
+  licenseNumber String?              @unique
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  profile       Profile              @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  facilities    PharmacistFacility[]
+}
+
+model PharmacistFacility {
+  pharmacistId String
+  facilityId   String
+  facility     HealthcareFacility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  pharmacist   Pharmacist         @relation(fields: [pharmacistId], references: [id], onDelete: Cascade)
+
+  @@id([pharmacistId, facilityId])
+}
+
+model LaboratoryStaff {
+  id            String               @id @default(uuid())
+  profileId     String               @unique
+  licenseNumber String?              @unique
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  facilities    LaboratoryFacility[]
+  profile       Profile              @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model LaboratoryFacility {
+  laboratoryStaffId String
+  facilityId        String
+  facility          HealthcareFacility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  laboratoryStaff   LaboratoryStaff    @relation(fields: [laboratoryStaffId], references: [id], onDelete: Cascade)
+
+  @@id([laboratoryStaffId, facilityId])
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  profileId String   @unique
+  createdAt DateTime @default(now())
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  patientId       String
+  doctorId        String
+  appointmentDate DateTime
+  type            AppointmentType   @default(IN_PERSON)
+  status          AppointmentStatus @default(PENDING)
+  reason          String?
+  notes           String?
+  location        String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  doctor          Doctor            @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient         Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([appointmentDate])
+}
+
+model MedicalRecord {
+  id         String   @id @default(uuid())
+  patientId  String
+  doctorId   String?
+  title      String
+  diagnosis  String?
+  symptoms   String?
+  notes      String?
+  recordDate DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  doctor     Doctor?  @relation(fields: [doctorId], references: [id])
+  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([doctorId])
+}
+
+model Prescription {
+  id                 String             @id @default(uuid())
+  patientId          String
+  doctorId           String
+  prescriptionNumber String             @unique
+  prescribedDate     DateTime           @default(now())
+  startDate          DateTime?
+  endDate            DateTime?
+  status             PrescriptionStatus @default(ACTIVE)
+  notes              String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  doctor             Doctor             @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient            Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  items              PrescriptionItem[]
+  refillRequests     RefillRequest[]
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([status])
+}
+
+model PrescriptionItem {
+  id             String       @id @default(uuid())
+  prescriptionId String
+  medicationName String
+  dosage         String
+  frequency      String?
+  route          String?
+  durationDays   Int?
+  quantity       Int?
+  instructions   String?
+  createdAt      DateTime     @default(now())
+  prescription   Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+
+  @@index([prescriptionId])
+}
+
+model RefillRequest {
+  id             String       @id @default(uuid())
+  patientId      String
+  prescriptionId String
+  requestedDate  DateTime     @default(now())
+  status         RefillStatus @default(REQUESTED)
+  notes          String?
+  response       String?
+  processedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  patient        Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  prescription   Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([prescriptionId])
+  @@index([status])
+}
+
+model LaboratoryResult {
+  id             String                @id @default(uuid())
+  patientId      String
+  testName       String
+  laboratoryName String?
+  testDate       DateTime
+  status         LaboratoryStatus      @default(PENDING)
+  reportUrl      String?
+  notes          String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  parameters     LaboratoryParameter[]
+  patient        Patient               @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([testDate])
+  @@index([status])
+}
+
+model LaboratoryParameter {
+  id                 String           @id @default(uuid())
+  laboratoryResultId String
+  name               String
+  value              String
+  unit               String?
+  referenceMin       Decimal?         @db.Decimal(10, 3)
+  referenceMax       Decimal?         @db.Decimal(10, 3)
+  flag               ResultFlag       @default(NORMAL)
+  createdAt          DateTime         @default(now())
+  laboratoryResult   LaboratoryResult @relation(fields: [laboratoryResultId], references: [id], onDelete: Cascade)
+
+  @@index([laboratoryResultId])
+}
+
+model Vaccination {
+  id              String    @id @default(uuid())
+  patientId       String
+  vaccineName     String
+  dose            String?
+  vaccinationDate DateTime
+  nextDueDate     DateTime?
+  provider        String?
+  batchNumber     String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  patient         Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([vaccinationDate])
+}
+
+model AIConversation {
+  id        String             @id @default(uuid())
+  patientId String
+  title     String?
+  status    ConversationStatus @default(ACTIVE)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  patient   Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  messages  AIMessage[]
+
+  @@index([patientId])
+}
+
+model AIMessage {
+  id             String         @id @default(uuid())
+  conversationId String
+  role           String
+  content        String
+  createdAt      DateTime       @default(now())
+  conversation   AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}
 
 enum UserType {
   PATIENT
@@ -87,561 +442,4 @@ enum FacilityType {
 enum ConversationStatus {
   ACTIVE
   ARCHIVED
-}
-
-// ======================================================
-// USER / PROFILE
-// ======================================================
-
-model Profile {
-  id         String @id @default(uuid())
-  authUserId String @unique
-
-  userType UserType
-
-  email     String @unique
-  firstName String
-  lastName  String
-
-  nationalId String?   @unique
-  gender     Gender?
-  birthDate  DateTime?
-
-  preferredLanguage String @default("fr")
-
-  phone     String?
-  avatarUrl String?
-
-  address    String?
-  city       String?
-  wilaya     String?
-  postalCode String?
-
-  latitude  Decimal? @db.Decimal(10, 7)
-  longitude Decimal? @db.Decimal(10, 7)
-
-  isVerified    Boolean       @default(false)
-  accountStatus AccountStatus @default(PENDING)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  patient         Patient?
-  doctor          Doctor?
-  pharmacist      Pharmacist?
-  laboratoryStaff LaboratoryStaff?
-  admin           Admin?
-
-  @@index([userType])
-  @@index([city])
-  @@index([wilaya])
-}
-
-// ======================================================
-// HEALTHCARE FACILITIES
-// ======================================================
-
-model HealthcareFacility {
-  id String @id @default(uuid())
-
-  name String
-  type FacilityType
-
-  registrationNumber String? @unique
-  description        String?
-
-  phone   String?
-  email   String?
-  website String?
-
-  address    String?
-  city       String?
-  wilaya     String?
-  postalCode String?
-
-  latitude  Decimal? @db.Decimal(10, 7)
-  longitude Decimal? @db.Decimal(10, 7)
-
-  openingHours     Json?
-  emergencyService Boolean @default(false)
-
-  isVerified Boolean @default(false)
-
-  logoUrl       String?
-  coverImageUrl String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  doctors         DoctorFacility[]
-  pharmacists     PharmacistFacility[]
-  laboratoryStaff LaboratoryFacility[]
-
-  @@index([type])
-  @@index([city])
-  @@index([wilaya])
-}
-
-// ======================================================
-// SPECIALTIES
-// ======================================================
-
-model Specialty {
-  id String @id @default(uuid())
-
-  name        String  @unique
-  description String?
-
-  doctors DoctorSpecialty[]
-
-  createdAt DateTime @default(now())
-}
-
-// ======================================================
-// DOCTOR
-// ======================================================
-
-model Doctor {
-  id String @id @default(uuid())
-
-  profileId String  @unique
-  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
-  licenseNumber        String  @unique
-  nationalRegistration String? @unique
-
-  biography       String?
-  yearsExperience Int?
-
-  consultationLanguages String?
-  education             String?
-  certifications        String?
-
-  consultationFee      Decimal? @db.Decimal(10, 2)
-  consultationDuration Int?
-
-  acceptsOnline          Boolean @default(false)
-  acceptsHomeVisit       Boolean @default(false)
-  isAcceptingNewPatients Boolean @default(true)
-
-  averageRating Decimal @default(0) @db.Decimal(3, 2)
-  totalReviews  Int     @default(0)
-
-  specialties DoctorSpecialty[]
-  facilities  DoctorFacility[]
-
-  appointments   Appointment[]
-  prescriptions  Prescription[]
-  medicalRecords MedicalRecord[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-// ======================================================
-// DOCTOR SPECIALTIES
-// ======================================================
-
-model DoctorSpecialty {
-  doctorId    String
-  specialtyId String
-
-  doctor    Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-  specialty Specialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
-
-  @@id([doctorId, specialtyId])
-}
-
-// ======================================================
-// DOCTOR FACILITIES
-// ======================================================
-
-model DoctorFacility {
-  doctorId   String
-  facilityId String
-
-  doctor   Doctor             @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-  facility HealthcareFacility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
-
-  @@id([doctorId, facilityId])
-}
-
-// ======================================================
-// PATIENT
-// ======================================================
-
-model Patient {
-  id String @id @default(uuid())
-
-  profileId String  @unique
-  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
-  emergencyContactName     String?
-  emergencyContactPhone    String?
-  emergencyContactRelation String?
-
-  guardianFirstName String?
-  guardianLastName  String?
-  guardianEmail     String?
-  guardianPhone     String?
-  guardianRelation  String?
-
-  bloodType         String?
-  allergies         String?
-  chronicConditions String?
-
-  medicalRecords    MedicalRecord[]
-  appointments      Appointment[]
-  prescriptions     Prescription[]
-  laboratoryResults LaboratoryResult[]
-  vaccinations      Vaccination[]
-  refillRequests    RefillRequest[]
-
-  conversations AIConversation[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-// ======================================================
-// PHARMACIST
-// ======================================================
-
-model Pharmacist {
-  id String @id @default(uuid())
-
-  profileId String  @unique
-  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
-  licenseNumber String? @unique
-
-  facilities PharmacistFacility[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model PharmacistFacility {
-  pharmacistId String
-  facilityId   String
-
-  pharmacist Pharmacist         @relation(fields: [pharmacistId], references: [id], onDelete: Cascade)
-  facility   HealthcareFacility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
-
-  @@id([pharmacistId, facilityId])
-}
-
-// ======================================================
-// LABORATORY STAFF
-// ======================================================
-
-model LaboratoryStaff {
-  id String @id @default(uuid())
-
-  profileId String  @unique
-  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
-  licenseNumber String? @unique
-
-  facilities LaboratoryFacility[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model LaboratoryFacility {
-  laboratoryStaffId String
-  facilityId        String
-
-  laboratoryStaff LaboratoryStaff    @relation(fields: [laboratoryStaffId], references: [id], onDelete: Cascade)
-  facility        HealthcareFacility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
-
-  @@id([laboratoryStaffId, facilityId])
-}
-
-// ======================================================
-// ADMIN
-// ======================================================
-
-model Admin {
-  id String @id @default(uuid())
-
-  profileId String  @unique
-  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-}
-
-// ======================================================
-// APPOINTMENTS
-// ======================================================
-
-model Appointment {
-  id String @id @default(uuid())
-
-  patientId String
-  doctorId  String
-
-patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
-
-doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-
-  appointmentDate DateTime
-
-  type   AppointmentType   @default(IN_PERSON)
-  status AppointmentStatus @default(PENDING)
-
-  reason   String?
-  notes    String?
-  location String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([patientId])
-  @@index([doctorId])
-  @@index([appointmentDate])
-  @@index([doctorId, appointmentDate])
-  @@index([patientId, appointmentDate])
-  @@index([status])
-}
-
-// ======================================================
-// MEDICAL RECORD
-// ======================================================
-
-model MedicalRecord {
-  id String @id @default(uuid())
-
-  patientId String
-  doctorId  String?
-
-  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  doctor  Doctor? @relation(fields: [doctorId], references: [id], onDelete: SetNull)
-
-  title     String
-  diagnosis String?
-  symptoms  String?
-  notes     String?
-
-  recordDate DateTime @default(now())
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([patientId])
-  @@index([doctorId])
-}
-
-// ======================================================
-// PRESCRIPTIONS
-// ======================================================
-
-model Prescription {
-  id String @id @default(uuid())
-
-  patientId String
-  doctorId  String
-
-  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  doctor  Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-
-  prescriptionNumber String @unique
-
-  prescribedDate DateTime  @default(now())
-  startDate      DateTime?
-  endDate        DateTime?
-
-  status PrescriptionStatus @default(ACTIVE)
-
-  notes String?
-
-  items          PrescriptionItem[]
-  refillRequests RefillRequest[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([patientId])
-  @@index([doctorId])
-  @@index([status])
-}
-
-// ======================================================
-// PRESCRIPTION ITEMS
-// ======================================================
-
-model PrescriptionItem {
-  id String @id @default(uuid())
-
-  prescriptionId String
-  prescription   Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
-
-  medicationName String
-  dosage         String
-  frequency      String?
-  route          String?
-
-  durationDays Int?
-  quantity     Int?
-
-  instructions String?
-
-  createdAt DateTime @default(now())
-
-  @@index([prescriptionId])
-}
-
-// ======================================================
-// REFILL REQUESTS
-// ======================================================
-
-model RefillRequest {
-  id String @id @default(uuid())
-
-  patientId      String
-  prescriptionId String
-
-  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
-
-  requestedDate DateTime @default(now())
-
-  status RefillStatus @default(REQUESTED)
-
-  notes    String?
-  response String?
-
-  processedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([patientId])
-  @@index([prescriptionId])
-  @@index([status])
-}
-
-// ======================================================
-// LABORATORY RESULTS
-// ======================================================
-
-model LaboratoryResult {
-  id String @id @default(uuid())
-
-  patientId String
-
-  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
-
-  testName       String
-  laboratoryName String?
-
-  testDate DateTime
-
-  status LaboratoryStatus @default(PENDING)
-
-  reportUrl String?
-  notes     String?
-
-  parameters LaboratoryParameter[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([patientId])
-  @@index([testDate])
-  @@index([status])
-}
-
-// ======================================================
-// LABORATORY PARAMETERS
-// ======================================================
-
-model LaboratoryParameter {
-  id String @id @default(uuid())
-
-  laboratoryResultId String
-
-  laboratoryResult LaboratoryResult @relation(fields: [laboratoryResultId], references: [id], onDelete: Cascade)
-
-  name  String
-  value String
-  unit  String?
-
-  referenceMin Decimal? @db.Decimal(10, 3)
-  referenceMax Decimal? @db.Decimal(10, 3)
-
-  flag ResultFlag @default(NORMAL)
-
-  createdAt DateTime @default(now())
-
-  @@index([laboratoryResultId])
-}
-
-// ======================================================
-// VACCINATIONS
-// ======================================================
-
-model Vaccination {
-  id String @id @default(uuid())
-
-  patientId String
-
-  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
-
-  vaccineName     String
-  dose            String?
-  vaccinationDate DateTime
-
-  nextDueDate DateTime?
-
-  provider    String?
-  batchNumber String?
-  notes       String?
-
-  createdAt DateTime @default(now())
-
-  @@index([patientId])
-  @@index([vaccinationDate])
-}
-
-// ======================================================
-// AI CONVERSATIONS
-// ======================================================
-
-model AIConversation {
-  id String @id @default(uuid())
-
-  patientId String
-
-  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
-
-  title  String?
-  status ConversationStatus @default(ACTIVE)
-
-  messages AIMessage[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([patientId])
-}
-
-// ======================================================
-// AI MESSAGES
-// ======================================================
-
-model AIMessage {
-  id String @id @default(uuid())
-
-  conversationId String
-
-  conversation AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  role    String
-  content String
-
-  createdAt DateTime @default(now())
-
-  @@index([conversationId])
 }
