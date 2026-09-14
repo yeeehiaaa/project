@@ -5,7 +5,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url = env("postgresql://postgres.tnwxpbbtfqmywrhvtztd:Algerie2001200@aws-0-eu-west-3.pooler.supabase.com:6543/postgres?pgbouncer=true")
 }
 
 // ======================================================
@@ -383,17 +382,9 @@ model Appointment {
   patientId String
   doctorId  String
 
-  patient Patient @relation(
-    fields: [patientId],
-    references: [id],
-    onDelete: Cascade
-  )
+patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
-  doctor Doctor @relation(
-    fields: [doctorId],
-    references: [id],
-    onDelete: Cascade
-  )
+doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
   appointmentDate DateTime
 
