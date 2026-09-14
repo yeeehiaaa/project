@@ -179,19 +179,23 @@ export default function RegisterPage() {
     return true;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError(null);
 
-    if (!validateForm()) {
-      return;
-    }
+  if (!validateForm()) {
+    return;
+  }
 
-    setLoading(true);
+  setLoading(true);
 
-    try {
-      // 1. Sign up with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+  try {
+    // ============================================================
+    // 1. CREATE SUPABASE AUTH ACCOUNT
+    // ============================================================
+
+    const { data: authData, error: authError } =
+      await supabase.auth.signUp({
         email: formData.email.trim(),
         password: formData.password,
         options: {
@@ -199,77 +203,188 @@ export default function RegisterPage() {
         },
       });
 
-      if (authError) {
-
-// Log the full error for debugging
+    if (authError) {
       console.error("Supabase signUp error:", authError);
-      console.error("Error message:", authError.message);
-      console.error("Error status:", authError.status);
 
-        if (authError.message && authError.message.toLowerCase().includes("already registered")) {
-          throw new Error("This email is already registered. Please sign in instead.");
-        }
-        throw new Error(authError.message);
+      if (
+        authError.message &&
+        authError.message.toLowerCase().includes("already registered")
+      ) {
+        throw new Error(
+          "This email is already registered. Please sign in instead."
+        );
       }
 
-      if (!authData.user) {
-        throw new Error("Failed to create user account.");
-      }
-
-      // 2. Create profile via API - FIXED: using /api/register
-      const profileData = {
-        authUserId: authData.user.id,
-        role: formData.role,
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
-        email: formData.email.trim(),
-        birthDate: formData.birthDate,
-        gender: formData.gender,
-        phone: formData.phone.trim(),
-        address: formData.address.trim() || null,
-        city: formData.city.trim() || null,
-        wilaya: formData.wilaya.trim() || null,
-        guardian: isMinor
-          ? {
-              firstName: formData.guardianFirstName.trim(),
-              lastName: formData.guardianLastName.trim(),
-              email: formData.guardianEmail.trim(),
-              phone: formData.guardianPhone.trim(),
-              relation: formData.guardianRelation.trim(),
-            }
-          : null,
-      };
-
-      const response = await fetch("/api/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(profileData),
-      });
-
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        console.error("API returned non-JSON:", text.substring(0, 200));
-        throw new Error("Server returned an error page. Please try again later.");
-      }
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to create profile.");
-      }
-
-      setSuccess(true);
-      setTimeout(() => {
-        router.push("/dashboard/patient");
-      }, 2000);
-    } catch (err) {
-      console.error("Registration error:", err);
-      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
-    } finally {
-      setLoading(false);
+      throw new Error(authError.message);
     }
-  };
+
+    if (!authData.user) {
+      throw new Error("Failed to create user account.");
+    }
+
+    // ============================================================
+    // 2. CREATE PROFILE + PATIENT
+    // ============================================================
+
+    const profileData = {
+      authUserId: authData.user.id,
+      role: formData.role,
+      firstName: formData.firstName.trim(),
+      lastName: formData.lastName.trim(),
+      email: formData.email.trim(),
+      birthDate: formData.birthDate,
+      gender: formData.gender,
+      phone: formData.phone.trim(),
+      address: formData.address.trim() || null,
+      city: formData.city.trim() || null,
+      wilaya: formData.wilaya.trim() || null,
+      guardian: isMinor
+        ? {
+            firstName: formData.guardianFirstName.trim(),
+            lastName: formData.guardianLastName.trim(),
+            email: formData.guardianEmail.trim(),
+            phone: formData.guardianPhone.trim(),
+            relation: formData.guardianRelation.trim(),
+          }
+        : null,
+    };
+
+    const response = await fetch("/api/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(profileData),
+    });
+
+    const contentType = response.headers.get("content-type");
+
+    if (!contentType || !contentType.includes("application/json")) {
+      const text = await response.text();
+
+      console.error(
+        "API returned non-JSON:",
+        text.substring(0, 200)
+      );
+
+      throw new Error(
+        "Server returned an error page. Please try again later."
+      );
+    }
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        result.error || "Failed to create profile."
+      );
+    }
+
+    console.log("Registration API success:", result);
+
+    // ============================================================
+    // 3. VERIFY THE SESSION
+    // ============================================================
+
+    const {
+      data: sessionData,
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      throw new Error(
+        "Your account was created, but the authentication session could not be established."
+      );
+    }
+
+    if (!sessionData.session) {
+      throw new Error(
+        "Your account was created successfully. Please verify your email and sign in."
+      );
+    }
+
+    const accessToken = sessionData.session.access_token;
+
+    // ============================================================
+    // 4. VERIFY THAT THE PROFILE IS AVAILABLE
+    //    Retry because DB/auth synchronization can take a moment.
+    // ============================================================
+
+    let profileVerified = false;
+
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      try {
+        const profileResponse = await fetch(
+          "/api/auth/profile",
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+            cache: "no-store",
+          }
+        );
+
+        const profileResult = await profileResponse.json();
+
+        console.log(
+          `Profile verification attempt ${attempt}:`,
+          profileResult
+        );
+
+        if (
+          profileResponse.ok &&
+          profileResult.userType === "PATIENT"
+        ) {
+          profileVerified = true;
+          break;
+        }
+      } catch (profileError) {
+        console.warn(
+          `Profile verification attempt ${attempt} failed:`,
+          profileError
+        );
+      }
+
+      // Wait before retrying
+      await new Promise((resolve) =>
+        setTimeout(resolve, 500)
+      );
+    }
+
+    // ============================================================
+    // 5. DON'T ENTER THE PATIENT DASHBOARD UNLESS VERIFIED
+    // ============================================================
+
+    if (!profileVerified) {
+      throw new Error(
+        "Your account was created, but your patient profile is not ready yet. Please sign in again."
+      );
+    }
+
+    // ============================================================
+    // 6. SUCCESS
+    // ============================================================
+
+    setSuccess(true);
+
+    // Give React time to render the success state,
+    // then navigate after everything has been verified.
+    setTimeout(() => {
+      router.replace("/dashboard/patient");
+    }, 800);
+  } catch (err) {
+    console.error("Registration error:", err);
+
+    setError(
+      err instanceof Error
+        ? err.message
+        : "An unexpected error occurred."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ============================================================
   // RENDER
