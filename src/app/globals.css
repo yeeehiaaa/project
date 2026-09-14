@@ -24,3 +24,51 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ============================================================
+   SIDEBAR SCROLLBAR
+   ============================================================ */
+
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #8b5cf6 #f1f5f9;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #8b5cf6;
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: #7c3aed;
+}
+
+/* ============================================================
+   DARK MODE SCROLLBAR (optional)
+   ============================================================ */
+
+@media (prefers-color-scheme: dark) {
+  .sidebar-scroll {
+    scrollbar-color: #8b5cf6 #1e293b;
+  }
+  .sidebar-scroll::-webkit-scrollbar-track {
+    background: #1e293b;
+  }
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    background: #8b5cf6;
+  }
+  .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+    background: #7c3aed;
+  }
+}
