@@ -81,30 +81,48 @@ model Specialty {
 }
 
 model Doctor {
-  id                     String            @id @default(uuid())
-  profileId              String            @unique
-  licenseNumber          String            @unique
-  nationalRegistration   String?           @unique
-  biography              String?
-  yearsExperience        Int?
-  consultationLanguages  String?
-  education              String?
-  certifications         String?
-  consultationFee        Decimal?          @db.Decimal(10, 2)
+  id        String @id @default(uuid())
+  profileId String @unique
+
+  // Professional identification
+  licenseNumber        String  @unique
+  nationalRegistration String? @unique
+
+  // Education
+  diploma        String?
+  diplomaNumber  String?
+  graduationYear Int?
+
+  // Experience
+  startPracticeYear Int?
+  yearsExperience   Int?
+
+  // Professional information
+  biography             String?
+  consultationLanguages String?
+  education             String?
+  certifications        String?
+
+  // Consultation
+  consultationFee        Decimal? @db.Decimal(10, 2)
   consultationDuration   Int?
-  acceptsOnline          Boolean           @default(false)
-  acceptsHomeVisit       Boolean           @default(false)
-  isAcceptingNewPatients Boolean           @default(true)
-  averageRating          Decimal           @default(0) @db.Decimal(3, 2)
-  totalReviews           Int               @default(0)
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
-  appointments           Appointment[]
-  profile                Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  facilities             DoctorFacility[]
-  specialties            DoctorSpecialty[]
-  medicalRecords         MedicalRecord[]
-  prescriptions          Prescription[]
+  acceptsOnline          Boolean  @default(false)
+  acceptsHomeVisit       Boolean  @default(false)
+  isAcceptingNewPatients Boolean  @default(true)
+
+  // Rating
+  averageRating Decimal @default(0) @db.Decimal(3, 2)
+  totalReviews  Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  appointments   Appointment[]
+  profile        Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  facilities     DoctorFacility[]
+  specialties    DoctorSpecialty[]
+  medicalRecords MedicalRecord[]
+  prescriptions  Prescription[]
 }
 
 model DoctorSpecialty {
@@ -126,29 +144,66 @@ model DoctorFacility {
 }
 
 model Patient {
-  id                       String             @id @default(uuid())
-  profileId                String             @unique
+  id        String @id @default(uuid())
+  profileId String @unique
+
+  // ============================================================
+  // MEDICAL INFORMATION PROVIDED BY THE PATIENT
+  // ============================================================
+
+  bloodType            String?
+  allergies            String?
+  chronicConditions    String?
+  currentMedications   String?
+  medicalHistory       String?
+  surgicalHistory      String?
+  familyMedicalHistory String?
+  vaccinationHistory   String?
+
+  // ============================================================
+  // LIFESTYLE
+  // ============================================================
+
+  smokingStatus      String?
+  alcoholConsumption String?
+  physicalActivity   String?
+  diet               String?
+
+  // ============================================================
+  // ADDITIONAL MEDICAL INFORMATION
+  // ============================================================
+
+  additionalMedicalInfo String?
+
+  // ============================================================
+  // EMERGENCY CONTACT
+  // ============================================================
+
   emergencyContactName     String?
   emergencyContactPhone    String?
   emergencyContactRelation String?
-  guardianFirstName        String?
-  guardianLastName         String?
-  guardianEmail            String?
-  guardianPhone            String?
-  guardianRelation         String?
-  bloodType                String?
-  allergies                String?
-  chronicConditions        String?
-  createdAt                DateTime           @default(now())
-  updatedAt                DateTime           @updatedAt
-  conversations            AIConversation[]
-  appointments             Appointment[]
-  laboratoryResults        LaboratoryResult[]
-  medicalRecords           MedicalRecord[]
-  profile                  Profile            @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  prescriptions            Prescription[]
-  refillRequests           RefillRequest[]
-  vaccinations             Vaccination[]
+
+  // ============================================================
+  // GUARDIAN - MAINLY FOR MINORS
+  // ============================================================
+
+  guardianFirstName String?
+  guardianLastName  String?
+  guardianEmail     String?
+  guardianPhone     String?
+  guardianRelation  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  conversations     AIConversation[]
+  appointments      Appointment[]
+  laboratoryResults LaboratoryResult[]
+  medicalRecords    MedicalRecord[]
+  profile           Profile            @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  prescriptions     Prescription[]
+  refillRequests    RefillRequest[]
+  vaccinations      Vaccination[]
 }
 
 model Pharmacist {

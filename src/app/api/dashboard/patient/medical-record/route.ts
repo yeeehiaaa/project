@@ -191,26 +191,37 @@ export async function GET(
         },
 
         select: {
-          id: true,
-          profileId: true,
+    id: true,
+    bloodType: true,
+    allergies: true,
+    chronicConditions: true,
 
-          emergencyContactName: true,
-          emergencyContactPhone: true,
-          emergencyContactRelation: true,
+    // AJOUTE CEUX-CI
+    currentMedications: true,
+    medicalHistory: true,
+    surgicalHistory: true,
+    familyMedicalHistory: true,
+    vaccinationHistory: true,
 
-          guardianFirstName: true,
-          guardianLastName: true,
-          guardianEmail: true,
-          guardianPhone: true,
-          guardianRelation: true,
+    smokingStatus: true,
+    alcoholConsumption: true,
+    physicalActivity: true,
+    diet: true,
 
-          bloodType: true,
-          allergies: true,
-          chronicConditions: true,
+    additionalMedicalInfo: true,
 
-          createdAt: true,
-          updatedAt: true,
-        },
+    emergencyContactName: true,
+    emergencyContactPhone: true,
+    emergencyContactRelation: true,
+
+    guardianFirstName: true,
+    guardianLastName: true,
+    guardianEmail: true,
+    guardianPhone: true,
+    guardianRelation: true,
+
+    updatedAt: true,
+  },
       });
 
     if (!patient) {
@@ -430,37 +441,46 @@ export async function GET(
       },
 
       patient: {
-        id: patient.id,
+  id: patient.id,
 
-        bloodType: patient.bloodType,
-        allergies: patient.allergies,
-        chronicConditions:
-          patient.chronicConditions,
+  bloodType: patient.bloodType,
+  allergies: patient.allergies,
+  chronicConditions: patient.chronicConditions,
 
-        emergencyContactName:
-          patient.emergencyContactName,
+  currentMedications: patient.currentMedications,
+  medicalHistory: patient.medicalHistory,
+  surgicalHistory: patient.surgicalHistory,
+  familyMedicalHistory: patient.familyMedicalHistory,
+  vaccinationHistory: patient.vaccinationHistory,
 
-        emergencyContactPhone:
-          patient.emergencyContactPhone,
+  smokingStatus: patient.smokingStatus,
+  alcoholConsumption: patient.alcoholConsumption,
+  physicalActivity: patient.physicalActivity,
+  diet: patient.diet,
 
-        emergencyContactRelation:
-          patient.emergencyContactRelation,
+  additionalMedicalInfo:
+    patient.additionalMedicalInfo,
 
-        guardianFirstName:
-          patient.guardianFirstName,
+  emergencyContactName:
+    patient.emergencyContactName,
+  emergencyContactPhone:
+    patient.emergencyContactPhone,
+  emergencyContactRelation:
+    patient.emergencyContactRelation,
 
-        guardianLastName:
-          patient.guardianLastName,
+  guardianFirstName:
+    patient.guardianFirstName,
+  guardianLastName:
+    patient.guardianLastName,
+  guardianEmail:
+    patient.guardianEmail,
+  guardianPhone:
+    patient.guardianPhone,
+  guardianRelation:
+    patient.guardianRelation,
 
-        guardianEmail:
-          patient.guardianEmail,
-
-        guardianPhone:
-          patient.guardianPhone,
-
-        guardianRelation:
-          patient.guardianRelation,
-      },
+  updatedAt: patient.updatedAt,
+},
 
       medicalRecords:
         medicalRecords.map((record) => ({
@@ -691,6 +711,321 @@ export async function GET(
       {
         status: 500,
       }
+    );
+  }
+}
+
+// ============================================================
+// PUT - UPDATE PATIENT MEDICAL INFORMATION
+// ============================================================
+
+export async function PUT(request: NextRequest) {
+  try {
+    // ----------------------------------------------------------
+    // 1. AUTHENTICATION
+    // ----------------------------------------------------------
+
+    const user = await getAuthenticatedUser(request);
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unauthorized.",
+        },
+        { status: 401 }
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 2. FIND PROFILE
+    // ----------------------------------------------------------
+
+    const profile = await prisma.profile.findUnique({
+      where: {
+        authUserId: user.id,
+      },
+      select: {
+        id: true,
+        userType: true,
+      },
+    });
+
+    if (!profile) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Profile not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 3. VERIFY PATIENT
+    // ----------------------------------------------------------
+
+    if (profile.userType !== "PATIENT") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "This account is not a patient account.",
+        },
+        { status: 403 }
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 4. FIND PATIENT
+    // ----------------------------------------------------------
+
+    const patient = await prisma.patient.findUnique({
+      where: {
+        profileId: profile.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!patient) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Patient record not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 5. READ REQUEST BODY
+    // ----------------------------------------------------------
+
+    const body = await request.json();
+
+    // ----------------------------------------------------------
+    // 6. NORMALIZE VALUES
+    // ----------------------------------------------------------
+
+    const normalize = (value: unknown): string | null => {
+      if (typeof value !== "string") {
+        return null;
+      }
+
+      const trimmed = value.trim();
+
+      return trimmed.length > 0 ? trimmed : null;
+    };
+
+    const bloodType = normalize(body.bloodType);
+    const allergies = normalize(body.allergies);
+    const chronicConditions = normalize(body.chronicConditions);
+
+    const currentMedications = normalize(
+      body.currentMedications
+    );
+
+    const medicalHistory = normalize(
+      body.medicalHistory
+    );
+
+    const surgicalHistory = normalize(
+      body.surgicalHistory
+    );
+
+    const familyMedicalHistory = normalize(
+      body.familyMedicalHistory
+    );
+
+    const vaccinationHistory = normalize(
+      body.vaccinationHistory
+    );
+
+    const smokingStatus = normalize(
+      body.smokingStatus
+    );
+
+    const alcoholConsumption = normalize(
+      body.alcoholConsumption
+    );
+
+    const physicalActivity = normalize(
+      body.physicalActivity
+    );
+
+    const diet = normalize(body.diet);
+
+    const additionalMedicalInfo = normalize(
+      body.additionalMedicalInfo
+    );
+
+    // Emergency contact
+
+    const emergencyContactName = normalize(
+      body.emergencyContactName
+    );
+
+    const emergencyContactPhone = normalize(
+      body.emergencyContactPhone
+    );
+
+    const emergencyContactRelation = normalize(
+      body.emergencyContactRelation
+    );
+
+    // Guardian
+
+    const guardianFirstName = normalize(
+      body.guardianFirstName
+    );
+
+    const guardianLastName = normalize(
+      body.guardianLastName
+    );
+
+    const guardianEmail = normalize(
+      body.guardianEmail
+    );
+
+    const guardianPhone = normalize(
+      body.guardianPhone
+    );
+
+    const guardianRelation = normalize(
+      body.guardianRelation
+    );
+
+    // ----------------------------------------------------------
+    // 7. VALIDATE BLOOD TYPE
+    // ----------------------------------------------------------
+
+    const validBloodTypes = [
+      "A+",
+      "A-",
+      "B+",
+      "B-",
+      "AB+",
+      "AB-",
+      "O+",
+      "O-",
+      "UNKNOWN",
+    ];
+
+    if (
+      bloodType &&
+      !validBloodTypes.includes(bloodType)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid blood type.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 8. UPDATE PATIENT
+    // ----------------------------------------------------------
+
+const updatedPatient = await prisma.patient.update({
+  where: {
+    id: patient.id,
+  },
+
+  data: {
+    bloodType,
+    allergies,
+    chronicConditions,
+
+    currentMedications,
+    medicalHistory,
+    surgicalHistory,
+    familyMedicalHistory,
+    vaccinationHistory,
+
+    smokingStatus,
+    alcoholConsumption,
+    physicalActivity,
+    diet,
+
+    additionalMedicalInfo,
+
+    emergencyContactName,
+    emergencyContactPhone,
+    emergencyContactRelation,
+
+    guardianFirstName,
+    guardianLastName,
+    guardianEmail,
+    guardianPhone,
+    guardianRelation,
+  },
+
+  select: {
+    id: true,
+
+    bloodType: true,
+    allergies: true,
+    chronicConditions: true,
+
+    currentMedications: true,
+    medicalHistory: true,
+    surgicalHistory: true,
+    familyMedicalHistory: true,
+    vaccinationHistory: true,
+
+    smokingStatus: true,
+    alcoholConsumption: true,
+    physicalActivity: true,
+    diet: true,
+
+    additionalMedicalInfo: true,
+
+    emergencyContactName: true,
+    emergencyContactPhone: true,
+    emergencyContactRelation: true,
+
+    guardianFirstName: true,
+    guardianLastName: true,
+    guardianEmail: true,
+    guardianPhone: true,
+    guardianRelation: true,
+
+    updatedAt: true,
+  },
+});
+
+    // ----------------------------------------------------------
+    // 9. SUCCESS RESPONSE
+    // ----------------------------------------------------------
+
+    return NextResponse.json({
+      success: true,
+      message:
+        "Medical information updated successfully.",
+      patient: updatedPatient,
+    });
+  } catch (error) {
+    console.error(
+      "PATIENT MEDICAL RECORD PUT ERROR:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "An error occurred while updating your medical information.",
+        details:
+          process.env.NODE_ENV === "development"
+            ? error instanceof Error
+              ? error.message
+              : String(error)
+            : undefined,
+      },
+      { status: 500 }
     );
   }
 }

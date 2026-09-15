@@ -33,27 +33,46 @@ export default function RegisterPage() {
   const [success, setSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [specialties, setSpecialties] = useState<
+  { id: string; name: string }[]
+>([]);
+
+const [loadingSpecialties, setLoadingSpecialties] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
-    role: "patient" as Role,
-    firstName: "",
-    lastName: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    birthDate: "",
-    gender: "" as "MALE" | "FEMALE" | "OTHER" | "",
-    phone: "",
-    address: "",
-    city: "",
-    wilaya: "",
-    guardianFirstName: "",
-    guardianLastName: "",
-    guardianEmail: "",
-    guardianPhone: "",
-    guardianRelation: "",
-  });
+  role: "patient" as Role,
+
+  firstName: "",
+  lastName: "",
+  email: "",
+  password: "",
+  confirmPassword: "",
+
+  birthDate: "",
+  gender: "" as "MALE" | "FEMALE" | "",
+
+  phone: "",
+  address: "",
+  city: "",
+  wilaya: "",
+
+  // Doctor information
+  doctorSpecialty: "",
+  doctorNationalId: "",
+  doctorDiploma: "",
+  doctorDiplomaNumber: "",
+  doctorGraduationYear: "",
+  doctorStartPracticeYear: "",
+  doctorRegistrationNumber: "",
+  doctorRegistrationAuthority: "",
+
+  guardianFirstName: "",
+  guardianLastName: "",
+  guardianEmail: "",
+  guardianPhone: "",
+  guardianRelation: "",
+});
 
   const [isMinor, setIsMinor] = useState(false);
   const [age, setAge] = useState<number | null>(null);
@@ -77,6 +96,36 @@ export default function RegisterPage() {
       setIsMinor(false);
     }
   }, [formData.birthDate]);
+
+
+useEffect(() => {
+  if (formData.role !== "doctor") {
+    return;
+  }
+
+  const fetchSpecialties = async () => {
+    try {
+      setLoadingSpecialties(true);
+
+      const response = await fetch("/api/specialties");
+
+      if (!response.ok) {
+        throw new Error("Failed to load specialties");
+      }
+
+      const data = await response.json();
+
+      setSpecialties(data);
+    } catch (error) {
+      console.error("Specialties loading error:", error);
+    } finally {
+      setLoadingSpecialties(false);
+    }
+  };
+
+  fetchSpecialties();
+}, [formData.role]);
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -226,28 +275,94 @@ const handleSubmit = async (e: React.FormEvent) => {
     // 2. CREATE PROFILE + PATIENT
     // ============================================================
 
-    const profileData = {
-      authUserId: authData.user.id,
-      role: formData.role,
-      firstName: formData.firstName.trim(),
-      lastName: formData.lastName.trim(),
-      email: formData.email.trim(),
-      birthDate: formData.birthDate,
-      gender: formData.gender,
-      phone: formData.phone.trim(),
-      address: formData.address.trim() || null,
-      city: formData.city.trim() || null,
-      wilaya: formData.wilaya.trim() || null,
-      guardian: isMinor
-        ? {
-            firstName: formData.guardianFirstName.trim(),
-            lastName: formData.guardianLastName.trim(),
-            email: formData.guardianEmail.trim(),
-            phone: formData.guardianPhone.trim(),
-            relation: formData.guardianRelation.trim(),
-          }
-        : null,
-    };
+const profileData = {
+  authUserId: authData.user.id,
+  role: formData.role,
+
+  // ============================================================
+  // GENERAL INFORMATION
+  // ============================================================
+
+  firstName: formData.firstName.trim(),
+  lastName: formData.lastName.trim(),
+  email: formData.email.trim(),
+  birthDate: formData.birthDate,
+  gender: formData.gender,
+  phone: formData.phone.trim(),
+
+  address: formData.address.trim() || null,
+  city: formData.city.trim() || null,
+  wilaya: formData.wilaya.trim() || null,
+
+  // ============================================================
+  // DOCTOR INFORMATION
+  // ============================================================
+
+  doctorSpecialty:
+    formData.role === "doctor"
+      ? formData.doctorSpecialty || null
+      : null,
+
+  doctorNationalId:
+    formData.role === "doctor"
+      ? formData.doctorNationalId.trim() || null
+      : null,
+
+  doctorDiploma:
+    formData.role === "doctor"
+      ? formData.doctorDiploma.trim() || null
+      : null,
+
+  doctorDiplomaNumber:
+    formData.role === "doctor"
+      ? formData.doctorDiplomaNumber.trim() || null
+      : null,
+
+  doctorGraduationYear:
+    formData.role === "doctor"
+      ? formData.doctorGraduationYear || null
+      : null,
+
+  doctorStartPracticeYear:
+    formData.role === "doctor"
+      ? formData.doctorStartPracticeYear || null
+      : null,
+
+  doctorRegistrationNumber:
+    formData.role === "doctor"
+      ? formData.doctorRegistrationNumber.trim() || null
+      : null,
+
+  doctorRegistrationAuthority:
+    formData.role === "doctor"
+      ? formData.doctorRegistrationAuthority.trim() || null
+      : null,
+
+  // ============================================================
+  // GUARDIAN - PATIENT MINOR ONLY
+  // ============================================================
+
+  guardian:
+    isMinor && formData.role === "patient"
+      ? {
+          firstName:
+            formData.guardianFirstName.trim(),
+
+          lastName:
+            formData.guardianLastName.trim(),
+
+          email:
+            formData.guardianEmail.trim(),
+
+          phone:
+            formData.guardianPhone.trim(),
+
+          relation:
+            formData.guardianRelation.trim(),
+        }
+      : null,
+};
+
 
     const response = await fetch("/api/register", {
       method: "POST",
@@ -332,13 +447,20 @@ const handleSubmit = async (e: React.FormEvent) => {
           profileResult
         );
 
-        if (
-          profileResponse.ok &&
-          profileResult.userType === "PATIENT"
-        ) {
-          profileVerified = true;
-          break;
-        }
+        const expectedUserType = {
+  patient: "PATIENT",
+  doctor: "DOCTOR",
+  pharmacy: "PHARMACIST",
+  laboratory: "LABORATORY_STAFF",
+}[formData.role];
+
+if (
+  profileResponse.ok &&
+  profileResult.userType === expectedUserType
+) {
+  profileVerified = true;
+  break;
+}
       } catch (profileError) {
         console.warn(
           `Profile verification attempt ${attempt} failed:`,
@@ -358,7 +480,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
     if (!profileVerified) {
       throw new Error(
-        "Your account was created, but your patient profile is not ready yet. Please sign in again."
+    `Your account was created, but your ${formData.role} profile is not ready yet. Please sign in again.`
       );
     }
 
@@ -371,8 +493,15 @@ const handleSubmit = async (e: React.FormEvent) => {
     // Give React time to render the success state,
     // then navigate after everything has been verified.
     setTimeout(() => {
-      router.replace("/dashboard/patient");
-    }, 800);
+  const dashboardByRole = {
+    patient: "/dashboard/patient",
+    doctor: "/dashboard/doctor",
+    pharmacy: "/dashboard/pharmacy",
+    laboratory: "/dashboard/laboratory",
+  } as const;
+
+  router.replace(dashboardByRole[formData.role]);
+}, 800);
   } catch (err) {
     console.error("Registration error:", err);
 
@@ -386,67 +515,105 @@ const handleSubmit = async (e: React.FormEvent) => {
   }
 };
 
-  // ============================================================
-  // RENDER
-  // ============================================================
+// ============================================================
+// RENDER
+// ============================================================
 
-  if (success) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-violet-50 via-white to-indigo-50 p-6">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md rounded-3xl bg-white p-10 text-center shadow-xl"
-        >
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
-            <CheckCircle size={40} className="text-emerald-600" />
-          </div>
-          <h2 className="mt-6 text-3xl font-bold text-slate-900">Registration Successful!</h2>
-          <p className="mt-3 text-slate-600">
-            Your account has been created. Please check your email to verify your account.
-          </p>
-          <p className="mt-2 text-sm text-slate-400">Redirecting to dashboard...</p>
-          <Loader2 className="mx-auto mt-4 animate-spin text-violet-600" size={28} />
-        </motion.div>
-      </div>
-    );
-  }
-
+if (success) {
   return (
-    <div className="flex min-h-screen overflow-hidden bg-gradient-to-br from-violet-50 via-white to-indigo-50">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-violet-50 via-white to-indigo-50 p-6">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-md rounded-3xl bg-white p-10 text-center shadow-xl"
+      >
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
+          <CheckCircle size={40} className="text-emerald-600" />
+        </div>
+
+        <h2 className="mt-6 text-3xl font-bold text-slate-900">
+          Registration Successful!
+        </h2>
+
+        <p className="mt-3 text-slate-600">
+          Your account has been created. Please check your email to verify
+          your account.
+        </p>
+
+        <p className="mt-2 text-sm text-slate-400">
+          Redirecting to dashboard...
+        </p>
+
+        <Loader2
+          className="mx-auto mt-4 animate-spin text-violet-600"
+          size={28}
+        />
+      </motion.div>
+    </div>
+  );
+}
+
+return (
+  <div className="min-h-screen bg-gradient-to-br from-violet-50 via-white to-indigo-50 lg:h-screen lg:overflow-hidden">
+    <div className="grid min-h-screen lg:h-screen lg:grid-cols-2">
+
       {/* LEFT PANEL – Brand & Info */}
       <motion.div
         initial={{ opacity: 0, x: -30 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.6 }}
-        className="relative hidden w-1/2 flex-col justify-center bg-gradient-to-br from-violet-700 via-indigo-700 to-blue-700 p-12 text-white lg:flex"
+        className="relative hidden h-screen flex-col justify-center overflow-hidden bg-gradient-to-br from-violet-700 via-indigo-700 to-blue-700 p-8 xl:p-10 text-white lg:flex"
       >
+        {/* Background decorations */}
         <div className="absolute -left-40 -top-40 h-96 w-96 rounded-full bg-white/5 blur-3xl" />
         <div className="absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-white/5 blur-3xl" />
         <div className="absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/5 blur-2xl" />
 
+        {/* Left content */}
         <div className="relative">
           <div className="flex items-center gap-3">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
-              <Sparkles size={32} className="text-white" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
+              <Sparkles size={27} className="text-white" />
             </div>
+
             <div>
-              <h1 className="text-3xl font-bold">MediConnect</h1>
-              <p className="text-sm text-violet-200">AI Healthcare Platform</p>
+              <h1 className="text-2xl font-bold xl:text-3xl">
+                MediConnect
+              </h1>
+
+              <p className="text-sm text-violet-200">
+                AI Healthcare Platform
+              </p>
             </div>
           </div>
 
-          <h2 className="mt-12 text-4xl font-bold leading-tight">Start your healthcare journey</h2>
-          <p className="mt-4 max-w-md text-lg text-violet-100">
-            Create your account and access intelligent healthcare services powered by AI.
+<h2 className="mt-8 text-3xl font-bold leading-tight xl:text-4xl">
+              Start your healthcare journey
+          </h2>
+
+<p className="mt-3 max-w-md text-base leading-relaxed text-violet-100">
+              Create your account and access intelligent healthcare services
+            powered by AI.
           </p>
 
-          <div className="mt-10 space-y-4">
+          <div className="mt-7 space-y-3">
             {[
-              { icon: Stethoscope, text: "Connect with trusted doctors" },
-              { icon: HeartPulse, text: "Access your medical records securely" },
-              { icon: Sparkles, text: "AI-powered health assistance 24/7" },
-              { icon: ShieldCheck, text: "HIPAA-compliant & secure" },
+              {
+                icon: Stethoscope,
+                text: "Connect with trusted doctors",
+              },
+              {
+                icon: HeartPulse,
+                text: "Access your medical records securely",
+              },
+              {
+                icon: Sparkles,
+                text: "AI-powered health assistance 24/7",
+              },
+              {
+                icon: ShieldCheck,
+                text: "HIPAA-compliant & secure",
+              },
             ].map((item, i) => (
               <motion.div
                 key={i}
@@ -455,16 +622,25 @@ const handleSubmit = async (e: React.FormEvent) => {
                 transition={{ delay: 0.3 + i * 0.1 }}
                 className="flex items-center gap-3 rounded-xl bg-white/10 p-3 backdrop-blur-sm"
               >
-                <item.icon size={20} className="text-violet-200" />
-                <span className="text-sm text-violet-50">{item.text}</span>
+                <item.icon
+                  size={20}
+                  className="text-violet-200"
+                />
+
+                <span className="text-sm text-violet-50">
+                  {item.text}
+                </span>
               </motion.div>
             ))}
           </div>
 
-          <div className="mt-12 border-t border-white/10 pt-8">
+          <div className="mt-8 border-t border-white/10 pt-6">
             <p className="text-sm text-violet-200">
               Already have an account?{" "}
-              <Link href="/login" className="font-semibold text-white underline underline-offset-2 hover:text-violet-100">
+              <Link
+                href="/login"
+                className="font-semibold text-white underline underline-offset-2 hover:text-violet-100"
+              >
                 Sign in
               </Link>
             </p>
@@ -473,52 +649,92 @@ const handleSubmit = async (e: React.FormEvent) => {
       </motion.div>
 
       {/* RIGHT PANEL – Registration Form */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        className="flex w-full flex-1 items-center justify-center p-6 lg:w-1/2 lg:p-12"
-      >
-        <div className="w-full max-w-2xl">
+      <div className="h-screen overflow-y-auto bg-white">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="flex min-h-full w-full justify-center p-6 sm:p-8 lg:p-12"
+        >
+          <div className="w-full max-w-2xl">
           {/* Mobile Logo */}
           <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600">
-              <Sparkles size={20} className="text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900">MediConnect</h1>
-              <p className="text-xs text-slate-400">AI Healthcare</p>
-            </div>
-          </div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600">
+                <Sparkles size={20} className="text-white" />
+              </div>
 
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold text-slate-900">Create Account</h2>
-            <p className="mt-2 text-slate-600">Join the future of healthcare.</p>
-          </div>
+              <div>
+                <h1 className="text-xl font-bold text-slate-900">
+                  MediConnect
+                </h1>
 
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-6 flex items-start gap-3 rounded-xl bg-red-50 p-4 text-red-700"
-            >
-              <AlertCircle size={20} className="mt-0.5 shrink-0" />
-              <p className="text-sm">
-                {error}
-                {error.toLowerCase().includes("already registered") && (
-                  <span>
-                    {" "}
-                    <Link href="/login" className="font-semibold underline hover:text-red-800">
-                      Sign in here
-                    </Link>
-                  </span>
-                )}
+                <p className="text-xs text-slate-400">
+                  AI Healthcare
+                </p>
+              </div>
+            </div>
+
+          {/* ================================================== */}
+            {/* HEADER                                             */}
+            {/* ================================================== */}
+
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold text-slate-900">
+                Create Account
+              </h2>
+
+              <p className="mt-2 text-slate-600">
+                Join the future of healthcare.
               </p>
-            </motion.div>
-          )}
+            </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Role Selection */}
+          {/* ================================================== */}
+            {/* ERROR                                              */}
+            {/* ================================================== */}
+
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-6 flex items-start gap-3 rounded-xl bg-red-50 p-4 text-red-700"
+              >
+                <AlertCircle
+                  size={20}
+                  className="mt-0.5 shrink-0"
+                />
+
+                <p className="text-sm">
+                  {error}
+
+                  {error
+                    .toLowerCase()
+                    .includes("already registered") && (
+                    <span>
+                      {" "}
+                      <Link
+                        href="/login"
+                        className="font-semibold underline hover:text-red-800"
+                      >
+                        Sign in here
+                      </Link>
+                    </span>
+                  )}
+                </p>
+              </motion.div>
+            )}
+
+          {/* ================================================== */}
+            {/* FORM                                               */}
+            {/* ================================================== */}
+
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-6 pb-12"
+            >
+              {/* ================================================= */}
+              {/* ROLE SELECTION                                    */}
+              {/* ================================================= */}
+
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">I am registering as a</label>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -821,6 +1037,230 @@ const handleSubmit = async (e: React.FormEvent) => {
               </div>
             </div>
 
+
+
+
+
+{formData.role === "doctor" && (
+  <motion.section
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.3 }}
+    className="mt-8 rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50/80 via-white to-indigo-50/70 p-6 shadow-sm"
+  >
+    <div className="mb-6 flex items-start gap-4">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-200">
+        <Stethoscope className="h-6 w-6" />
+      </div>
+
+      <div>
+        <h3 className="text-lg font-bold text-slate-900">
+          Professional Information
+        </h3>
+
+        <p className="mt-1 text-sm text-slate-500">
+          Please provide your professional medical information.
+        </p>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+
+      {/* Specialty */}
+      <div>
+        <label
+          htmlFor="doctorSpecialty"
+          className="mb-2 block text-sm font-semibold text-slate-700"
+        >
+          Medical Specialty *
+        </label>
+
+        <select
+  id="doctorSpecialty"
+  name="doctorSpecialty"
+  value={formData.doctorSpecialty}
+  onChange={handleChange}
+  onBlur={handleBlur}
+  disabled={loadingSpecialties}
+>
+  <option value="">
+    {loadingSpecialties
+      ? "Loading specialties..."
+      : "Select your specialty"}
+  </option>
+
+  {specialties.map((specialty) => (
+    <option key={specialty.id} value={specialty.id}>
+      {specialty.name}
+    </option>
+  ))}
+</select>
+
+      </div>
+
+      {/* National ID */}
+      <div>
+        <label
+          htmlFor="doctorNationalId"
+          className="mb-2 block text-sm font-semibold text-slate-700"
+        >
+          National ID Number *
+        </label>
+
+        <input
+          id="doctorNationalId"
+          name="doctorNationalId"
+          type="text"
+          value={formData.doctorNationalId}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          placeholder="Enter your national ID number"
+          className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+        />
+      </div>
+
+      {/* Diploma */}
+      <div>
+        <label
+          htmlFor="doctorDiploma"
+          className="mb-2 block text-sm font-semibold text-slate-700"
+        >
+          Medical Diploma *
+        </label>
+
+        <input
+          id="doctorDiploma"
+          name="doctorDiploma"
+          type="text"
+          value={formData.doctorDiploma}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          placeholder="e.g. Doctor of Medicine"
+          className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+        />
+      </div>
+
+      {/* Diploma Number */}
+      <div>
+        <label
+          htmlFor="doctorDiplomaNumber"
+          className="mb-2 block text-sm font-semibold text-slate-700"
+        >
+          Diploma Number
+        </label>
+
+        <input
+          id="doctorDiplomaNumber"
+          name="doctorDiplomaNumber"
+          type="text"
+          value={formData.doctorDiplomaNumber}
+          onChange={handleChange}
+          placeholder="Enter diploma number"
+          className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+        />
+      </div>
+
+      {/* Graduation Year */}
+      <div>
+        <label
+          htmlFor="doctorGraduationYear"
+          className="mb-2 block text-sm font-semibold text-slate-700"
+        >
+          Graduation Year *
+        </label>
+
+        <input
+          id="doctorGraduationYear"
+          name="doctorGraduationYear"
+          type="number"
+          min="1950"
+          max={new Date().getFullYear()}
+          value={formData.doctorGraduationYear}
+          onChange={handleChange}
+          placeholder="e.g. 2020"
+          className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+        />
+      </div>
+
+      {/* Start Practice */}
+      <div>
+        <label
+          htmlFor="doctorStartPracticeYear"
+          className="mb-2 block text-sm font-semibold text-slate-700"
+        >
+          Year Started Practicing *
+        </label>
+
+        <input
+          id="doctorStartPracticeYear"
+          name="doctorStartPracticeYear"
+          type="number"
+          min="1950"
+          max={new Date().getFullYear()}
+          value={formData.doctorStartPracticeYear}
+          onChange={handleChange}
+          placeholder="e.g. 2022"
+          className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+        />
+      </div>
+
+      {/* Registration Number */}
+      <div>
+        <label
+          htmlFor="doctorRegistrationNumber"
+          className="mb-2 block text-sm font-semibold text-slate-700"
+        >
+          Professional Registration Number
+        </label>
+
+        <input
+          id="doctorRegistrationNumber"
+          name="doctorRegistrationNumber"
+          type="text"
+          value={formData.doctorRegistrationNumber}
+          onChange={handleChange}
+          placeholder="Enter registration number"
+          className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+        />
+      </div>
+
+      {/* Registration Authority */}
+      <div>
+        <label
+          htmlFor="doctorRegistrationAuthority"
+          className="mb-2 block text-sm font-semibold text-slate-700"
+        >
+          Registration Authority
+        </label>
+
+        <input
+          id="doctorRegistrationAuthority"
+          name="doctorRegistrationAuthority"
+          type="text"
+          value={formData.doctorRegistrationAuthority}
+          onChange={handleChange}
+          placeholder="e.g. Medical Council"
+          className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+        />
+      </div>
+
+    </div>
+
+    <div className="mt-5 flex items-start gap-3 rounded-2xl bg-violet-100/60 p-4">
+      <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-violet-600" />
+
+      <p className="text-xs leading-5 text-violet-800">
+        Your professional information will be used to create and verify
+        your MediConnect AI healthcare professional profile.
+      </p>
+    </div>
+  </motion.section>
+)}
+
+
+
+
+
             {/* Guardian Fields – shown only for minors */}
             {isMinor && (
               <motion.div
@@ -964,7 +1404,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   id="terms"
                   checked={termsAccepted}
                   onChange={(e) => setTermsAccepted(e.target.checked)}
-                  className="mt-1 h-5 w-5 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                  className="mt-1 h-5 w-5 cursor-pointer rounded border-slate-300 text-violet-600 focus:ring-violet-500"
                 />
                 <label htmlFor="terms" className="cursor-pointer text-sm text-slate-600">
                   I agree to the{" "}
@@ -1014,6 +1454,8 @@ const handleSubmit = async (e: React.FormEvent) => {
           </form>
         </div>
       </motion.div>
+    </div>
+    </div>
     </div>
   );
 }
