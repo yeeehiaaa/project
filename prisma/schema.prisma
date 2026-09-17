@@ -445,6 +445,8 @@ enum AccountStatus {
 enum AppointmentStatus {
   PENDING
   CONFIRMED
+  WAITING
+  IN_PROGRESS
   COMPLETED
   CANCELLED
   NO_SHOW
