@@ -73,12 +73,14 @@ interface DoctorPrescriptionsViewProps {
     email: string;
     address: string;
   };
+  onModalChange?: (isOpen: boolean) => void;
 }
 
 export default function DoctorPrescriptionsView({
   isDark,
   onOpenNewPrescription,
   doctorInfo,
+  onModalChange,
 }: DoctorPrescriptionsViewProps) {
   const [prescriptions, setPrescriptions] = useState<PrescriptionRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -86,6 +88,11 @@ export default function DoctorPrescriptionsView({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPrescription, setSelectedPrescription] =
     useState<PrescriptionRecord | null>(null);
+
+  // Notify parent dashboard to hide dock when viewing prescription detail
+  useEffect(() => {
+    onModalChange?.(Boolean(selectedPrescription));
+  }, [selectedPrescription, onModalChange]);
 
   const fetchPrescriptions = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setIsRefreshing(true);
@@ -97,7 +104,7 @@ export default function DoctorPrescriptionsView({
         const data = await res.json();
         if (Array.isArray(data)) {
           // Normalize names
-          const normalized = data.map((item: any) => {
+          const normalized: PrescriptionRecord[] = data.map((item: any) => {
             const pFirst = item.patient?.profile?.firstName || "";
             const pLast = item.patient?.profile?.lastName || "";
             const computedPatientName =
@@ -127,18 +134,49 @@ export default function DoctorPrescriptionsView({
             };
           });
 
-          // Check if localStorage has offline-signed prescriptions to merge
+          // Check if localStorage has offline-signed prescriptions to merge (avoiding duplicates)
           try {
             const localStored = localStorage.getItem("mediconnect_prescriptions");
             if (localStored) {
               const localList = JSON.parse(localStored);
               if (Array.isArray(localList)) {
-                // Prepend or merge non-duplicate local records
-                const existingIds = new Set(normalized.map((n: any) => n.id));
+                // Collect existing IDs and Prescription Numbers from DB results
+                const existingIds = new Set(
+                  normalized
+                    .map((n) => n.id?.toString().trim())
+                    .filter(Boolean)
+                );
+                const existingNumbers = new Set(
+                  normalized
+                    .map((n) => n.prescriptionNumber?.toString().trim().toUpperCase())
+                    .filter(Boolean)
+                );
+
+                const remainingLocal: any[] = [];
                 for (const loc of localList) {
-                  if (!existingIds.has(loc.id)) {
+                  const locId = loc.id?.toString().trim();
+                  const locNum = loc.prescriptionNumber?.toString().trim().toUpperCase();
+
+                  const isAlreadyInDb =
+                    (locId && existingIds.has(locId)) ||
+                    (locNum && existingNumbers.has(locNum));
+
+                  if (!isAlreadyInDb) {
                     normalized.unshift(loc);
+                    if (locId) existingIds.add(locId);
+                    if (locNum) existingNumbers.add(locNum);
+                    remainingLocal.push(loc);
                   }
+                }
+
+                // Keep only truly un-synced items in localStorage to prevent duplicate pollution
+                try {
+                  localStorage.setItem(
+                    "mediconnect_prescriptions",
+                    JSON.stringify(remainingLocal)
+                  );
+                } catch {
+                  // ignore
                 }
               }
             }
@@ -146,7 +184,27 @@ export default function DoctorPrescriptionsView({
             // ignore
           }
 
-          setPrescriptions(normalized);
+          // Strict final deduplication pass across all records by prescriptionNumber and id
+          const uniqueMap = new Map<string, PrescriptionRecord>();
+          const seenNum = new Set<string>();
+
+          for (const item of normalized) {
+            const numKey = item.prescriptionNumber ? item.prescriptionNumber.trim().toUpperCase() : "";
+            const idKey = item.id ? item.id.trim() : "";
+
+            if (numKey && seenNum.has(numKey)) {
+              continue; // Skip duplicate prescription number
+            }
+            if (idKey && uniqueMap.has(idKey)) {
+              continue; // Skip duplicate ID
+            }
+
+            if (numKey) seenNum.add(numKey);
+            if (idKey) uniqueMap.set(idKey, item);
+            else uniqueMap.set(`key-${Math.random()}`, item);
+          }
+
+          setPrescriptions(Array.from(uniqueMap.values()));
         }
       }
     } catch (err) {

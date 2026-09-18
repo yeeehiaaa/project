@@ -28,6 +28,7 @@ interface DoctorIpadDockProps {
   isDark: boolean;
   unreadMessagesCount?: number;
   urgentCount?: number;
+  hidden?: boolean;
 }
 
 export default function DoctorIpadDock({
@@ -36,7 +37,9 @@ export default function DoctorIpadDock({
   isDark,
   unreadMessagesCount = 2,
   urgentCount = 0,
+  hidden = false,
 }: DoctorIpadDockProps) {
+  if (hidden) return null;
   const dockItems: {
     id: DoctorTabType | "card";
     label: string;

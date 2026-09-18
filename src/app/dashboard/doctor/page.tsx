@@ -561,13 +561,17 @@ export default function DoctorDashboard() {
   const [showNewAppointmentModal, setShowNewAppointmentModal] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [isMessengerModalOpen, setIsMessengerModalOpen] = useState(false);
+  const [isPrescriptionViewModalOpen, setIsPrescriptionViewModalOpen] = useState(false);
+  const [isPatientViewModalOpen, setIsPatientViewModalOpen] = useState(false);
 
   const isAnyModalOpen = Boolean(
     showConsultationModal ||
     showPrescriptionModal ||
     showNewAppointmentModal ||
     showVideoModal ||
-    isMessengerModalOpen
+    isMessengerModalOpen ||
+    isPrescriptionViewModalOpen ||
+    isPatientViewModalOpen
   );
 
   // ============================================================
@@ -608,37 +612,36 @@ export default function DoctorDashboard() {
 
   const [prescriptionItems, setPrescriptionItems] = useState<
     PrescriptionItem[]
-  >([
-    {
-      id: "med-1",
-      medication: "Kardégic (Acide Acétylsalicylique)",
-      dosage: "75 mg",
-      frequency: "1 sachet par jour le midi",
-      duration: "30 jours",
-      instructions: "Prendre au milieu d'un repas avec un grand verre d'eau",
-    },
-    {
-      id: "med-2",
-      medication: "Bisoprolol (Bêta-bloquant)",
-      dosage: "2.5 mg",
-      frequency: "1 comprimé le matin",
-      duration: "30 jours",
-      instructions: "Contrôle du rythme cardiaque. Ne pas arrêter brutalement.",
-    },
-  ]);
+  >([]);
 
   const [newMedName, setNewMedName] = useState("");
   const [newMedDosage, setNewMedDosage] = useState("");
   const [newMedFreq, setNewMedFreq] = useState("");
   const [newMedDuration, setNewMedDuration] = useState("");
   const [newMedInstructions, setNewMedInstructions] = useState("");
-  const [prescriptionNotes, setPrescriptionNotes] = useState(
-    "Contrôle biologique et surveillance de la tension artérielle dans 30 jours."
-  );
+  const [prescriptionNotes, setPrescriptionNotes] = useState("");
+  const [isSavingPrescription, setIsSavingPrescription] = useState(false);
   const [prescriptionSuccessNotice, setPrescriptionSuccessNotice] =
     useState(false);
   const [prescriptionNoticeMessage, setPrescriptionNoticeMessage] =
     useState("");
+
+  // Helper to start a fresh new prescription without carrying over previous medications
+  const handleOpenNewPrescription = (patientName?: string) => {
+    setPrescriptionItems([]);
+    setNewMedName("");
+    setNewMedDosage("");
+    setNewMedFreq("");
+    setNewMedDuration("");
+    setNewMedInstructions("");
+    setPrescriptionNotes("");
+    if (patientName) {
+      setPrescriptionPatient(patientName);
+    } else {
+      setPrescriptionPatient(patients[0]?.name || "Karim Haddad");
+    }
+    setShowPrescriptionModal(true);
+  };
 
   // ============================================================
   // LOAD DOCTOR DASHBOARD
@@ -984,6 +987,9 @@ export default function DoctorDashboard() {
   };
 
   const handleSignPrescription = async () => {
+    if (isSavingPrescription) return;
+    setIsSavingPrescription(true);
+
     // 1. Download certified PDF
     handleDownloadPrescriptionPdf();
 
@@ -1018,17 +1024,16 @@ export default function DoctorDashboard() {
         }),
       });
 
-      if (res.ok) {
-        const savedPresc = await res.json();
-        // Also update local storage cache for instant offline-first display
+      if (!res.ok) {
+        // Only write to localStorage as offline fallback if API request failed!
         try {
           const currentLocal = JSON.parse(
             localStorage.getItem("mediconnect_prescriptions") || "[]"
           );
           currentLocal.unshift({
-            id: savedPresc.id || `presc-local-${Date.now()}`,
-            prescriptionNumber: savedPresc.prescriptionNumber || `ORD-${Date.now()}`,
-            prescribedDate: savedPresc.prescribedDate || new Date().toISOString(),
+            id: `presc-local-${Date.now()}`,
+            prescriptionNumber: `ORD-${Date.now()}`,
+            prescribedDate: new Date().toISOString(),
             patientId: patientObj?.id || prescriptionPatient,
             patientName: patientObj?.name || prescriptionPatient,
             doctorName: doctorInfo.name,
@@ -1053,6 +1058,8 @@ export default function DoctorDashboard() {
       }
     } catch (saveErr) {
       console.error("Error saving prescription to DB:", saveErr);
+    } finally {
+      setIsSavingPrescription(false);
     }
 
     setPrescriptionNoticeMessage(
@@ -1062,6 +1069,14 @@ export default function DoctorDashboard() {
     setTimeout(() => {
       setPrescriptionSuccessNotice(false);
       setShowPrescriptionModal(false);
+      // Clean form for next prescription to avoid carrying over medications
+      setPrescriptionItems([]);
+      setNewMedName("");
+      setNewMedDosage("");
+      setNewMedFreq("");
+      setNewMedDuration("");
+      setNewMedInstructions("");
+      setPrescriptionNotes("");
     }, 2800);
   };
 
@@ -2092,10 +2107,7 @@ export default function DoctorDashboard() {
 
                         <button
                           type="button"
-                          onClick={() => {
-                            setPrescriptionPatient(apt.patientName);
-                            setShowPrescriptionModal(true);
-                          }}
+                          onClick={() => handleOpenNewPrescription(apt.patientName)}
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
                             isDark
                               ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700"
@@ -2299,10 +2311,7 @@ export default function DoctorDashboard() {
               setSelectedCalendarDate(date || null);
               setShowNewAppointmentModal(true);
             }}
-            onOpenPrescription={(patientName) => {
-              setPrescriptionPatient(patientName);
-              setShowPrescriptionModal(true);
-            }}
+            onOpenPrescription={handleOpenNewPrescription}
           />
         )}
 
@@ -2331,11 +2340,8 @@ export default function DoctorDashboard() {
               }
               setShowNewAppointmentModal(true);
             }}
-            onOpenPrescription={(patientName) => {
-              setPrescriptionPatient(patientName);
-              setShowPrescriptionModal(true);
-            }}
-            onModalChange={setIsMessengerModalOpen}
+            onOpenPrescription={handleOpenNewPrescription}
+            onModalChange={setIsPatientViewModalOpen}
           />
         )}
 
@@ -2343,11 +2349,9 @@ export default function DoctorDashboard() {
         {activeTab === "prescriptions" && (
           <DoctorPrescriptionsView
             isDark={isDark}
-            onOpenNewPrescription={(patientName) => {
-              if (patientName) setPrescriptionPatient(patientName);
-              setShowPrescriptionModal(true);
-            }}
+            onOpenNewPrescription={handleOpenNewPrescription}
             doctorInfo={doctorInfo}
+            onModalChange={setIsPrescriptionViewModalOpen}
           />
         )}
 
@@ -2691,8 +2695,7 @@ export default function DoctorDashboard() {
                   type="button"
                   onClick={() => {
                     setShowConsultationModal(false);
-                    setPrescriptionPatient(selectedAppointment.patientName);
-                    setShowPrescriptionModal(true);
+                    handleOpenNewPrescription(selectedAppointment?.patientName);
                   }}
                   className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border font-semibold text-xs transition cursor-pointer ${
                     isDark
@@ -2745,7 +2748,7 @@ export default function DoctorDashboard() {
 
           return (
             <div
-              className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm ${
+              className={`fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm ${
                 isDark ? "bg-slate-950/80" : "bg-slate-900/60"
               }`}
             >
@@ -2796,7 +2799,16 @@ export default function DoctorDashboard() {
 
                   <button
                     type="button"
-                    onClick={() => setShowPrescriptionModal(false)}
+                    onClick={() => {
+                      setShowPrescriptionModal(false);
+                      setPrescriptionItems([]);
+                      setNewMedName("");
+                      setNewMedDosage("");
+                      setNewMedFreq("");
+                      setNewMedDuration("");
+                      setNewMedInstructions("");
+                      setPrescriptionNotes("");
+                    }}
                     className={`p-2 rounded-xl transition cursor-pointer ${
                       isDark
                         ? "text-slate-400 hover:text-white hover:bg-slate-800"
@@ -3340,7 +3352,16 @@ export default function DoctorDashboard() {
                   <div className="flex items-center gap-2.5 flex-wrap justify-end">
                     <button
                       type="button"
-                      onClick={() => setShowPrescriptionModal(false)}
+                      onClick={() => {
+                        setShowPrescriptionModal(false);
+                        setPrescriptionItems([]);
+                        setNewMedName("");
+                        setNewMedDosage("");
+                        setNewMedFreq("");
+                        setNewMedDuration("");
+                        setNewMedInstructions("");
+                        setPrescriptionNotes("");
+                      }}
                       className={`px-3.5 py-2 rounded-xl font-semibold text-xs transition cursor-pointer ${
                         isDark
                           ? "text-slate-400 hover:text-white hover:bg-slate-800"
@@ -3350,11 +3371,35 @@ export default function DoctorDashboard() {
                       Fermer
                     </button>
 
+                    {prescriptionItems.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPrescriptionItems([]);
+                          setNewMedName("");
+                          setNewMedDosage("");
+                          setNewMedFreq("");
+                          setNewMedDuration("");
+                          setNewMedInstructions("");
+                          setPrescriptionNotes("");
+                        }}
+                        className={`px-3 py-2 rounded-xl font-semibold text-xs transition cursor-pointer ${
+                          isDark
+                            ? "text-rose-400 hover:bg-rose-950/30 hover:text-rose-300"
+                            : "text-rose-600 hover:bg-rose-50"
+                        }`}
+                        title="Vider tous les médicaments pour repartir d'une ordonnance vierge"
+                      >
+                        Effacer tout
+                      </button>
+                    )}
+
                     {/* PROMINENT DOWNLOAD BUTTON REQUESTED BY USER */}
                     <button
                       type="button"
+                      disabled={isSavingPrescription || prescriptionItems.length === 0}
                       onClick={handleDownloadPrescriptionPdf}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md hover:shadow-indigo-500/25 transition cursor-pointer"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-md hover:shadow-indigo-500/25 transition cursor-pointer"
                     >
                       <Download size={16} />
                       <span>Télécharger l&apos;Ordonnance (PDF)</span>
@@ -3362,11 +3407,16 @@ export default function DoctorDashboard() {
 
                     <button
                       type="button"
+                      disabled={isSavingPrescription || prescriptionItems.length === 0}
                       onClick={handleSignPrescription}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs shadow-md hover:shadow-violet-500/25 transition cursor-pointer"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-md hover:shadow-violet-500/25 transition cursor-pointer"
                     >
-                      <ShieldCheck size={16} />
-                      <span>Signer & Télécharger</span>
+                      {isSavingPrescription ? (
+                        <RefreshCw size={16} className="animate-spin" />
+                      ) : (
+                        <ShieldCheck size={16} />
+                      )}
+                      <span>{isSavingPrescription ? "Enregistrement..." : "Signer & Télécharger"}</span>
                     </button>
                   </div>
                 </div>
@@ -3805,11 +3855,12 @@ export default function DoctorDashboard() {
       {/* ============================================================
           IPADOS FLOATING BOTTOM DOCK BAR
           (Dashboard, Agenda, Calendrier, Messenger, Patients, Ordonnances, IA, Profil)
-          Caché automatiquement lorsqu'une modale est ouverte
+          Caché automatiquement lorsqu'une modale est ouverte ou ordonnance affichée
       ============================================================ */}
       <AnimatePresence>
-        {!isAnyModalOpen && (
+        {!isAnyModalOpen && !showPrescriptionModal && (
           <DoctorIpadDock
+            key="doctor-ipad-dock"
             activeTab={activeTab}
             onChangeTab={(tab) => {
               setActiveTab(tab);
@@ -3817,6 +3868,7 @@ export default function DoctorDashboard() {
             isDark={isDark}
             urgentCount={urgentCount}
             unreadMessagesCount={2}
+            hidden={isAnyModalOpen || showPrescriptionModal}
           />
         )}
       </AnimatePresence>
