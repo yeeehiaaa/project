@@ -1,8 +1,9 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import {
+import { useSearchParams } from "next/navigation";import {
   Store,
   Search,
   X,
