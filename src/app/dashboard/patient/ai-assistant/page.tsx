@@ -721,6 +721,7 @@ export default function AIAssistantPage() {
         role: "assistant",
         content:
           "Le service d'analyse IA a temporairement atteint sa limite de requêtes. Veuillez patienter quelques instants avant de réessayer.",
+        time: nowTime(),
       },
     ]);
 
