@@ -9,7 +9,7 @@ const testimonials = [
     name: "Ahmed Benali",
     role: "Patient",
     image: "https://i.pravatar.cc/150?img=12",
-    text: "MediConnect AI made booking appointments incredibly simple. The AI assistant answered my questions instantly.",
+    text: "DOCTORZ Co. made booking appointments incredibly simple. The AI assistant answered my questions instantly.",
     rating: 5,
   },
   {
@@ -76,7 +76,7 @@ export default function Testimonials() {
           </h2>
           <p className="mt-6 text-lg text-slate-600">
             Hear what patients and healthcare professionals say about
-            MediConnect AI.
+            DOCTORZ Co.
           </p>
         </motion.div>
 

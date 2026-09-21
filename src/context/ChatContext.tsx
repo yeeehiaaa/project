@@ -33,7 +33,7 @@ export function ChatProvider({
     {
       id: 1,
       sender: "ai",
-      text: "Hello! I'm MediConnect AI. How can I help you today?",
+      text: "Hello! I'm DOCTORZ Co. How can I help you today?",
     },
   ]);
 

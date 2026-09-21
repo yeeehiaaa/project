@@ -247,7 +247,7 @@ export default function Sidebar() {
 
           <div className="leading-tight">
             <h2 className="text-lg font-bold tracking-tight text-slate-900">
-              MediConnect
+              DOCTORZ Co.
             </h2>
             <p className="text-xs font-medium text-slate-400">AI Healthcare</p>
           </div>

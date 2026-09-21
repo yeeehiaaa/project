@@ -73,7 +73,7 @@ export default function HowItWorks() {
             </span>
           </h2>
           <p className="mt-6 text-lg text-slate-600">
-            MediConnect AI simplifies the entire healthcare journey,
+            DOCTORZ Co. simplifies the entire healthcare journey,
             from registration to treatment.
           </p>
         </motion.div>

@@ -43,7 +43,7 @@ export default function AILabInsights() {
           </div>
 
           <h2 className="text-4xl font-bold">
-            MediConnect AI Laboratory Analysis
+            DOCTORZ Co. Laboratory Analysis
           </h2>
 
           <p className="mt-4 text-lg leading-8 text-violet-100">

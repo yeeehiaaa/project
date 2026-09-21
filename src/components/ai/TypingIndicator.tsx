@@ -38,7 +38,7 @@ export default function TypingIndicator() {
         </div>
 
         <p className="mt-3 text-sm text-slate-500">
-          MediConnect AI is thinking...
+          DOCTORZ Co. is thinking...
         </p>
 
       </div>

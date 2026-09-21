@@ -167,8 +167,10 @@ export default function DoctorCalendarView({
   const prevMonthLastDay = new Date(year, month, 0).getDate();
 
   // Map appointments to date strings "YYYY-MM-DD"
+  // (les rendez-vous refusés/annulés ne restent pas dans l'agenda)
   const appointmentsByDate = appointments.reduce((acc, apt) => {
     try {
+      if (apt.status === "CANCELLED") return acc;
       const key = extractAppointmentDateKey(apt.appointmentDate);
       if (key) {
         if (!acc[key]) acc[key] = [];
@@ -631,7 +633,7 @@ export default function DoctorCalendarView({
           >
             <div className="flex items-center gap-1.5 text-[11px]">
               <Sparkles size={13} className="text-indigo-500" />
-              <span>Synchronisation sécurisée MediConnect</span>
+              <span>Synchronisation sécurisée DOCTORZ Co.</span>
             </div>
             {selectedDate && (
               <button

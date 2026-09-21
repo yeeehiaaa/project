@@ -68,6 +68,22 @@ const registerSchema = z.object({
     .optional()
     .nullable(),
 
+  // ==========================================================
+  // PHARMACY INFORMATION
+  // ==========================================================
+
+  pharmacyName: z.string().optional().nullable(),
+
+  pharmacyLicense: z.string().optional().nullable(),
+
+  pharmacyPhone: z.string().optional().nullable(),
+
+  pharmacyCity: z.string().optional().nullable(),
+
+  pharmacyWilaya: z.string().optional().nullable(),
+
+  pharmacyAddress: z.string().optional().nullable(),
+
   guardian: guardianSchema.optional().nullable(),
 });
 
@@ -547,17 +563,59 @@ export async function POST(request: Request) {
           }
 
           // ====================================================
-          // PHARMACIST
+          // PHARMACIST (+ sa pharmacie si renseignée)
           // ====================================================
 
           case "PHARMACIST": {
+            const license =
+              typeof body.pharmacyLicense === "string" &&
+              body.pharmacyLicense.trim()
+                ? body.pharmacyLicense.trim()
+                : null;
+
             roleData =
               await tx.pharmacist.create({
                 data: {
                   profileId:
                     profile.id,
+                  licenseNumber: license,
                 },
               });
+
+            const shopName =
+              typeof body.pharmacyName === "string"
+                ? body.pharmacyName.trim()
+                : "";
+
+            if (shopName) {
+              const str = (v: unknown): string | null => {
+                if (typeof v !== "string") return null;
+                const t = v.trim();
+                return t ? t : null;
+              };
+
+              const facility =
+                await tx.healthcareFacility.create({
+                  data: {
+                    name: shopName.slice(0, 120),
+                    type: "PHARMACY",
+                    city: str(body.pharmacyCity)?.slice(0, 80) || null,
+                    wilaya:
+                      str(body.pharmacyWilaya)?.slice(0, 80) || null,
+                    address:
+                      str(body.pharmacyAddress)?.slice(0, 200) || null,
+                    phone:
+                      str(body.pharmacyPhone)?.slice(0, 40) || null,
+                  },
+                });
+
+              await tx.pharmacistFacility.create({
+                data: {
+                  pharmacistId: roleData.id,
+                  facilityId: facility.id,
+                },
+              });
+            }
 
             break;
           }

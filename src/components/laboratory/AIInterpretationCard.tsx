@@ -53,7 +53,7 @@ export default function AIInterpretationCard() {
             <BrainCircuit size={18} />
 
             <span className="text-sm font-semibold">
-              MediConnect AI Analysis
+              DOCTORZ Co. Analysis
             </span>
           </div>
 

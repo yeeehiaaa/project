@@ -26,6 +26,7 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { usePatientTheme } from "@/components/patient/PatientThemeContext";
 
 // ======================================================
 // TYPES
@@ -89,6 +90,7 @@ interface FormData {
 
 export default function PatientProfilePage() {
   const router = useRouter();
+  const { isDark } = usePatientTheme();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -290,10 +292,16 @@ export default function PatientProfilePage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-violet-50 via-white to-indigo-50 p-6">
+      <main
+        className={
+          isDark
+            ? "flex min-h-screen items-center justify-center bg-transparent p-6"
+            : "flex min-h-screen items-center justify-center bg-gradient-to-br from-sky-50 via-white to-blue-50 p-6"
+        }
+      >
         <div className="flex flex-col items-center gap-4">
-          <Loader2 size={38} className="animate-spin text-violet-600" />
-          <p className="text-sm font-medium text-slate-500">Loading your profile...</p>
+          <Loader2 size={38} className="animate-spin text-sky-600" />
+          <p className={isDark ? "text-sm font-medium text-slate-400" : "text-sm font-medium text-slate-500"}>Loading your profile...</p>
         </div>
       </main>
     );
@@ -305,20 +313,30 @@ export default function PatientProfilePage() {
 
   if (!profile) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-violet-50 via-white to-indigo-50 p-6">
+      <main
+        className={
+          isDark
+            ? "flex min-h-screen items-center justify-center bg-transparent p-6"
+            : "flex min-h-screen items-center justify-center bg-gradient-to-br from-sky-50 via-white to-blue-50 p-6"
+        }
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-lg rounded-[32px] bg-white p-10 text-center shadow-xl"
+          className={
+            isDark
+              ? "w-full max-w-lg rounded-[32px] bg-slate-900/80 p-10 text-center shadow-xl border border-slate-800"
+              : "w-full max-w-lg rounded-[32px] bg-white p-10 text-center shadow-xl"
+          }
         >
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 text-red-500">
             <AlertCircle size={30} />
           </div>
-          <h1 className="mt-6 text-2xl font-bold text-slate-900">Unable to load your profile</h1>
-          <p className="mt-3 text-slate-500">{error || "Profile information is unavailable."}</p>
+          <h1 className={isDark ? "mt-6 text-2xl font-bold text-white" : "mt-6 text-2xl font-bold text-slate-900"}>Unable to load your profile</h1>
+          <p className={isDark ? "mt-3 text-slate-400" : "mt-3 text-slate-500"}>{error || "Profile information is unavailable."}</p>
           <button
             onClick={loadProfile}
-            className="mt-8 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-3 font-semibold text-white shadow-lg shadow-violet-200 transition hover:shadow-xl hover:shadow-violet-300"
+            className="mt-8 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 px-6 py-3 font-semibold text-white transition hover:from-blue-600 hover:to-sky-400 cursor-pointer active:scale-[0.97]"
           >
             Try Again
           </button>
@@ -349,7 +367,13 @@ export default function PatientProfilePage() {
   // ======================================================
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-violet-50 via-white to-indigo-50 p-6 lg:p-10">
+    <main
+      className={
+        isDark
+          ? "min-h-screen bg-transparent p-6 lg:p-10"
+          : "min-h-screen bg-gradient-to-br from-sky-50 via-white to-blue-50 p-6 lg:p-10"
+      }
+    >
       <div className="mx-auto max-w-7xl">
         {/* Two-Column Layout with Sticky Left */}
         <div className="grid gap-8 lg:grid-cols-12 lg:gap-10">
@@ -364,7 +388,11 @@ export default function PatientProfilePage() {
               >
                 <Link
                   href="/dashboard/patient"
-                  className="inline-flex items-center gap-2 rounded-xl bg-white/80 px-4 py-2.5 text-sm font-semibold text-violet-600 shadow-sm backdrop-blur-sm transition hover:bg-violet-50 hover:text-violet-700 border border-slate-200/70"
+                  className={
+                    isDark
+                      ? "inline-flex items-center gap-2 rounded-xl bg-slate-900/80 px-4 py-2.5 text-sm font-semibold text-sky-300 backdrop-blur-sm transition hover:bg-sky-500/15 hover:text-sky-200 border border-slate-800 cursor-pointer active:scale-[0.97]"
+                      : "inline-flex items-center gap-2 rounded-xl bg-white/80 px-4 py-2.5 text-sm font-semibold text-sky-600 backdrop-blur-sm transition hover:bg-sky-50 hover:text-sky-700 border border-slate-200/70 cursor-pointer active:scale-[0.97]"
+                  }
                 >
                   <ArrowLeft size={18} />
                   Back to Dashboard
@@ -376,7 +404,7 @@ export default function PatientProfilePage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.1 }}
-                className="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 p-6 text-white shadow-xl"
+                className="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-sky-600 via-blue-600 to-blue-600 p-6 text-white shadow-xl"
               >
                 <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
                 <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
@@ -386,7 +414,7 @@ export default function PatientProfilePage() {
                     {initials}
                   </div>
                   <h2 className="mt-4 text-2xl font-bold">{fullName}</h2>
-                  <p className="text-sm text-violet-100">{profile.email}</p>
+                  <p className="text-sm text-sky-100">{profile.email}</p>
 
                   <div className="mt-4 flex items-center gap-2">
                     <span
@@ -407,17 +435,17 @@ export default function PatientProfilePage() {
 
                   <div className="mt-6 grid w-full grid-cols-3 gap-3 rounded-2xl bg-white/10 p-4 backdrop-blur">
                     <div>
-                      <p className="text-xs text-violet-200">Patient</p>
+                      <p className="text-xs text-sky-200">Patient</p>
                       <p className="mt-1 text-lg font-bold">Active</p>
                     </div>
                     <div>
-                      <p className="text-xs text-violet-200">Member</p>
+                      <p className="text-xs text-sky-200">Member</p>
                       <p className="mt-1 text-lg font-bold">
                         {profile.birthDate ? new Date(profile.birthDate).getFullYear() : "—"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-violet-200">Gender</p>
+                      <p className="text-xs text-sky-200">Gender</p>
                       <p className="mt-1 text-lg font-bold">
                         {profile.gender ? profile.gender.charAt(0) + profile.gender.slice(1).toLowerCase() : "—"}
                       </p>
@@ -428,7 +456,13 @@ export default function PatientProfilePage() {
 
               {/* Quick Stats */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-2xl bg-white/80 p-4 shadow-sm backdrop-blur-sm border border-slate-200/70">
+                <div
+                  className={
+                    isDark
+                      ? "rounded-2xl bg-slate-900/80 p-4 shadow-sm backdrop-blur-sm border border-slate-800"
+                      : "rounded-2xl bg-white/80 p-4 shadow-sm backdrop-blur-sm border border-slate-200/70"
+                  }
+                >
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                       <ShieldCheck size={18} />
@@ -441,14 +475,20 @@ export default function PatientProfilePage() {
                     </div>
                   </div>
                 </div>
-                <div className="rounded-2xl bg-white/80 p-4 shadow-sm backdrop-blur-sm border border-slate-200/70">
+                <div
+                  className={
+                    isDark
+                      ? "rounded-2xl bg-slate-900/80 p-4 shadow-sm backdrop-blur-sm border border-slate-800"
+                      : "rounded-2xl bg-white/80 p-4 shadow-sm backdrop-blur-sm border border-slate-200/70"
+                  }
+                >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
                       <Stethoscope size={18} />
                     </div>
                     <div>
                       <p className="text-xs text-slate-400">Type</p>
-                      <p className="text-sm font-semibold text-violet-600">Patient</p>
+                      <p className="text-sm font-semibold text-sky-600">Patient</p>
                     </div>
                   </div>
                 </div>
@@ -490,13 +530,23 @@ export default function PatientProfilePage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.1 }}
-                className="rounded-[30px] bg-white/80 p-8 shadow-sm backdrop-blur-sm border border-slate-200/70"
+                className={
+                  isDark
+                    ? "rounded-[30px] bg-slate-900/80 p-8 shadow-sm backdrop-blur-sm border border-slate-800"
+                    : "rounded-[30px] bg-white/80 p-8 shadow-sm backdrop-blur-sm border border-slate-200/70"
+                }
               >
                 {/* Header with Edit Button */}
-                <div className="flex flex-col justify-between gap-4 pb-6 border-b border-slate-200/70 md:flex-row md:items-center">
+                <div
+                  className={
+                    isDark
+                      ? "flex flex-col justify-between gap-4 pb-6 border-b border-slate-800 md:flex-row md:items-center"
+                      : "flex flex-col justify-between gap-4 pb-6 border-b border-slate-200/70 md:flex-row md:items-center"
+                  }
+                >
                   <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Profile Details</h1>
-                    <p className="text-sm text-slate-500">Manage your personal information</p>
+                    <h1 className={isDark ? "text-2xl font-bold text-white" : "text-2xl font-bold text-slate-900"}>Profile Details</h1>
+                    <p className={isDark ? "text-sm text-slate-400" : "text-sm text-slate-500"}>Manage your personal information</p>
                   </div>
                   {!editing ? (
                     <motion.button
@@ -507,7 +557,7 @@ export default function PatientProfilePage() {
                         setSuccess("");
                         setEditing(true);
                       }}
-                      className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2.5 font-semibold text-white shadow-lg shadow-violet-200 transition hover:shadow-xl hover:shadow-violet-300"
+                      className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 px-5 py-2.5 font-semibold text-white transition hover:from-blue-600 hover:to-sky-400 cursor-pointer active:scale-[0.97]"
                     >
                       <Pencil size={18} />
                       Edit Profile
@@ -517,7 +567,11 @@ export default function PatientProfilePage() {
                       <button
                         onClick={handleCancel}
                         disabled={saving}
-                        className="flex items-center gap-2 rounded-xl bg-slate-100 px-5 py-2.5 font-semibold text-slate-700 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+                        className={
+                          isDark
+                            ? "flex items-center gap-2 rounded-xl bg-slate-800 px-5 py-2.5 font-semibold text-slate-200 transition hover:bg-slate-700 cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
+                            : "flex items-center gap-2 rounded-xl bg-slate-100 px-5 py-2.5 font-semibold text-slate-700 transition hover:bg-slate-200 cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
+                        }
                       >
                         <X size={18} />
                         Cancel
@@ -527,7 +581,7 @@ export default function PatientProfilePage() {
                         whileTap={{ scale: 0.98 }}
                         onClick={handleSave}
                         disabled={saving}
-                        className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2.5 font-semibold text-white shadow-lg shadow-violet-200 transition hover:shadow-xl hover:shadow-violet-300 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 px-5 py-2.5 font-semibold text-white transition hover:from-blue-600 hover:to-sky-400 cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                         {saving ? "Saving..." : "Save Changes"}
@@ -538,8 +592,8 @@ export default function PatientProfilePage() {
 
                 {/* PERSONAL INFORMATION */}
                 <section className="mt-8">
-                  <h2 className="text-lg font-bold text-slate-900">Personal Information</h2>
-                  <p className="mt-1 text-sm text-slate-500">Your basic personal details</p>
+                  <h2 className={isDark ? "text-lg font-bold text-white" : "text-lg font-bold text-slate-900"}>Personal Information</h2>
+                  <p className={isDark ? "mt-1 text-sm text-slate-400" : "mt-1 text-sm text-slate-500"}>Your basic personal details</p>
 
                   {editing ? (
                     <div className="mt-4 grid gap-5 md:grid-cols-2">
@@ -581,10 +635,16 @@ export default function PatientProfilePage() {
                         onChange={(value) => updateField("preferredLanguage", value)}
                       />
                       <div className="md:col-span-2">
-                        <label className="mb-2 block text-sm font-semibold text-slate-700">Email</label>
-                        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <label className={isDark ? "mb-2 block text-sm font-semibold text-slate-200" : "mb-2 block text-sm font-semibold text-slate-700"}>Email</label>
+                        <div
+                          className={
+                            isDark
+                              ? "flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3"
+                              : "flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                          }
+                        >
                           <Mail size={19} className="text-slate-400" />
-                          <span className="text-slate-500">{profile.email}</span>
+                          <span className={isDark ? "text-slate-400" : "text-slate-500"}>{profile.email}</span>
                         </div>
                         <p className="mt-2 text-xs text-slate-400">Email cannot be changed from this page.</p>
                       </div>
@@ -606,9 +666,15 @@ export default function PatientProfilePage() {
                 </section>
 
                 {/* ADDRESS SECTION */}
-                <section className="mt-8 pt-8 border-t border-slate-200/70">
-                  <h2 className="text-lg font-bold text-slate-900">Address</h2>
-                  <p className="mt-1 text-sm text-slate-500">Your current address</p>
+                <section
+                  className={
+                    isDark
+                      ? "mt-8 pt-8 border-t border-slate-800"
+                      : "mt-8 pt-8 border-t border-slate-200/70"
+                  }
+                >
+                  <h2 className={isDark ? "text-lg font-bold text-white" : "text-lg font-bold text-slate-900"}>Address</h2>
+                  <p className={isDark ? "mt-1 text-sm text-slate-400" : "mt-1 text-sm text-slate-500"}>Your current address</p>
 
                   {editing ? (
                     <div className="mt-4 grid gap-5 md:grid-cols-2">
@@ -645,9 +711,15 @@ export default function PatientProfilePage() {
 
                 {/* HEALTH INFORMATION */}
                 {patient && (
-                  <section className="mt-8 pt-8 border-t border-slate-200/70">
-                    <h2 className="text-lg font-bold text-slate-900">Health Information</h2>
-                    <p className="mt-1 text-sm text-slate-500">Your medical record details</p>
+                  <section
+                    className={
+                      isDark
+                        ? "mt-8 pt-8 border-t border-slate-800"
+                        : "mt-8 pt-8 border-t border-slate-200/70"
+                    }
+                  >
+                    <h2 className={isDark ? "text-lg font-bold text-white" : "text-lg font-bold text-slate-900"}>Health Information</h2>
+                    <p className={isDark ? "mt-1 text-sm text-slate-400" : "mt-1 text-sm text-slate-500"}>Your medical record details</p>
 
                     <div className="mt-4 grid gap-5 md:grid-cols-3">
                       <InfoCard
@@ -692,16 +764,23 @@ function InfoCard({
   value: string;
   valueClassName?: string;
 }) {
+  const { isDark } = usePatientTheme();
+  const resolvedValueClass =
+    valueClassName === "text-slate-900" ? (isDark ? "text-white" : "text-slate-900") : valueClassName;
   return (
     <motion.div
       whileHover={{ y: -2, scale: 1.01 }}
-      className="rounded-2xl bg-slate-50 p-5 transition hover:bg-violet-50"
+      className={
+        isDark
+          ? "rounded-2xl bg-slate-950/60 p-5 transition hover:bg-sky-500/10 border border-slate-800"
+          : "rounded-2xl bg-slate-50 p-5 transition hover:bg-sky-50"
+      }
     >
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600">{icon}</div>
-        <p className="text-sm font-medium text-slate-500">{label}</p>
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 text-sky-600">{icon}</div>
+        <p className={isDark ? "text-sm font-medium text-slate-400" : "text-sm font-medium text-slate-500"}>{label}</p>
       </div>
-      <p className={`mt-4 break-words text-base font-semibold ${valueClassName}`}>{value}</p>
+      <p className={`mt-4 break-words text-base font-semibold ${resolvedValueClass}`}>{value}</p>
     </motion.div>
   );
 }
@@ -721,14 +800,19 @@ function InputField({
   onChange: (value: string) => void;
   type?: string;
 }) {
+  const { isDark } = usePatientTheme();
   return (
     <div>
-      <label className="mb-2 block text-sm font-semibold text-slate-700">{label}</label>
+      <label className={isDark ? "mb-2 block text-sm font-semibold text-slate-200" : "mb-2 block text-sm font-semibold text-slate-700"}>{label}</label>
       <input
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+        className={
+          isDark
+            ? "w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/20"
+            : "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
+        }
       />
     </div>
   );
@@ -749,13 +833,18 @@ function SelectField({
   onChange: (value: string) => void;
   options: { value: string; label: string }[];
 }) {
+  const { isDark } = usePatientTheme();
   return (
     <div>
-      <label className="mb-2 block text-sm font-semibold text-slate-700">{label}</label>
+      <label className={isDark ? "mb-2 block text-sm font-semibold text-slate-200" : "mb-2 block text-sm font-semibold text-slate-700"}>{label}</label>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+        className={
+          isDark
+            ? "w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-500/20"
+            : "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
+        }
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

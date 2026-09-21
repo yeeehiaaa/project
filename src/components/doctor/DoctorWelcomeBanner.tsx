@@ -185,7 +185,7 @@ export default function DoctorWelcomeBanner({
               >
                 <Building size={13} className="shrink-0 opacity-80" />
                 <span className="truncate max-w-[280px] sm:max-w-none">
-                  {doctorInfo.cabinet || "Cabinet Médical MediConnect"}
+                  {doctorInfo.cabinet || "Cabinet Médical DOCTORZ Co."}
                 </span>
               </div>
             </div>

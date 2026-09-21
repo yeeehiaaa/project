@@ -291,7 +291,7 @@ export const INITIAL_REAL_CONVERSATIONS: Conversation[] = [
       {
         id: "grp-msg-1",
         senderId: "system",
-        senderName: "MediConnect Securitas",
+        senderName: "DOCTORZ Co. Securitas",
         senderRole: "system",
         text: "Groupe médical sécurisé créé par le Dr. Sarah Khelifi. 4 praticiens hospitaliers et spécialistes connectés. Échanges chiffrés de bout en bout selon les normes HDS.",
         time: "01 Sep 09:00",
@@ -539,41 +539,122 @@ export const INITIAL_REAL_CONVERSATIONS: Conversation[] = [
   },
 ];
 
-const STORAGE_KEY = "mediconnect_doctor_conversations_db_v5";
+const STORAGE_KEY = "mediconnect_doctor_conversations_db_v6";
 
-export function loadConversationsFromStorage(): Conversation[] {
+// Per-doctor namespaced storage so doctor 1 never sees doctor 2's local state.
+// Storage shape per doctor: Conversation[]
+export function storageKeyForDoctor(doctorId?: string | null): string {
+  if (!doctorId) return STORAGE_KEY;
+  return `${STORAGE_KEY}__${doctorId}`;
+}
+
+// Shared delivery bus: when doctor A sends a message to doctor B,
+// it is appended here so doctor B receives it on next load/poll,
+// even on another device/account. Stored as: Record<recipientDoctorId, MessageEnvelope[]>
+const SHARED_INBOX_KEY = "mediconnect_shared_doctor_inbox_v1";
+
+export interface InboxEnvelope {
+  conversationKey: string; // e.g. colleague id or group id hint
+  peerDoctorId?: string; // recipient doctor contact id (for 1:1)
+  groupId?: string; // recipient group conversation id (for groups)
+  patientId?: string; // for patient messages routed to a doctor
+  message: import("@/types/messenger").Message;
+  conversationSnapshot?: import("@/types/messenger").Conversation;
+  createdAt: string;
+  fromDoctorId: string;
+  fromDoctorName: string;
+}
+
+export function pushToSharedInbox(recipientDoctorId: string, envelope: InboxEnvelope): void {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(SHARED_INBOX_KEY);
+    const store = raw ? JSON.parse(raw) : {};
+    const list = Array.isArray(store[recipientDoctorId]) ? store[recipientDoctorId] : [];
+    list.push(envelope);
+    store[recipientDoctorId] = list;
+    localStorage.setItem(SHARED_INBOX_KEY, JSON.stringify(store));
+  } catch (err) {
+    console.warn("pushToSharedInbox error:", err);
+  }
+}
+
+export function pullSharedInbox(recipientDoctorId: string): InboxEnvelope[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(SHARED_INBOX_KEY);
+    if (!raw) return [];
+    const store = JSON.parse(raw);
+    const list = Array.isArray(store[recipientDoctorId]) ? store[recipientDoctorId] : [];
+    // consume
+    if (list.length > 0) {
+      store[recipientDoctorId] = [];
+      localStorage.setItem(SHARED_INBOX_KEY, JSON.stringify(store));
+    }
+    return list;
+  } catch (err) {
+    console.warn("pullSharedInbox error:", err);
+    return [];
+  }
+}
+
+export function peekSharedInbox(recipientDoctorId: string): InboxEnvelope[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(SHARED_INBOX_KEY);
+    if (!raw) return [];
+    const store = JSON.parse(raw);
+    return Array.isArray(store[recipientDoctorId]) ? store[recipientDoctorId] : [];
+  } catch {
+    return [];
+  }
+}
+
+export function loadConversationsFromStorage(doctorId?: string | null): Conversation[] {
   if (typeof window === "undefined") {
     return INITIAL_REAL_CONVERSATIONS;
   }
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const key = storageKeyForDoctor(doctorId);
+    const raw = localStorage.getItem(key);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_REAL_CONVERSATIONS));
-      return INITIAL_REAL_CONVERSATIONS;
+      // New doctor account starts with an EMPTY inbox (no leak from doctor 1).
+      // Only the legacy default account (no id / doc-sarah) keeps demo data.
+      const isLegacyDefault =
+        !doctorId || doctorId === "doc-sarah" || doctorId.includes("sarah");
+      const initial: Conversation[] = isLegacyDefault ? INITIAL_REAL_CONVERSATIONS : [];
+      localStorage.setItem(key, JSON.stringify(initial));
+      return initial;
     }
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
+    if (Array.isArray(parsed)) {
       return parsed;
     }
   } catch (err) {
     console.warn("Error loading conversations from localStorage:", err);
   }
-  return INITIAL_REAL_CONVERSATIONS;
+  return [];
 }
 
-export function saveConversationsToStorage(conversations: Conversation[]): void {
+export function saveConversationsToStorage(
+  conversations: Conversation[],
+  doctorId?: string | null
+): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+    localStorage.setItem(storageKeyForDoctor(doctorId), JSON.stringify(conversations));
   } catch (err) {
     console.error("Error saving conversations to localStorage:", err);
   }
 }
 
-export function resetConversationsToDefault(): Conversation[] {
+export function resetConversationsToDefault(doctorId?: string | null): Conversation[] {
   if (typeof window !== "undefined") {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_REAL_CONVERSATIONS));
+      localStorage.setItem(
+        storageKeyForDoctor(doctorId),
+        JSON.stringify(INITIAL_REAL_CONVERSATIONS)
+      );
     } catch (err) {
       console.warn("Error resetting storage:", err);
     }

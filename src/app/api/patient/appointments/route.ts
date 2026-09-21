@@ -197,6 +197,10 @@ export async function GET(request: NextRequest) {
 
           status: appointment.status,
 
+          previousDate: appointment.previousDate
+            ? appointment.previousDate.toISOString()
+            : null,
+
           location,
 
           avatar,
@@ -715,6 +719,236 @@ export async function POST(request: NextRequest) {
         success: false,
         error:
           "Unable to book appointment.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// =====================================================
+// PATCH - PATIENT DECISIONS (négociation de créneaux)
+// Actions :
+// - accept   : RESCHEDULED -> CONFIRMED (accepte le créneau du médecin)
+// - refuse   : RESCHEDULED -> CANCELLED (refuse le créneau du médecin)
+// - cancel   : PENDING/CONFIRMED -> CANCELLED (annule sa demande/RDV)
+// - propose  : PENDING/CONFIRMED + appointmentDate -> PENDING
+//              (le patient propose un autre créneau, le médecin re-décide)
+// =====================================================
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const authorization =
+      request.headers.get("authorization");
+
+    if (!authorization?.startsWith("Bearer ")) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Not authenticated.",
+        },
+        { status: 401 }
+      );
+    }
+
+    const token = authorization
+      .substring(7)
+      .trim();
+
+    const {
+      data: userData,
+      error: userError,
+    } = await supabase.auth.getUser(token);
+
+    if (userError || !userData.user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid authentication session.",
+        },
+        { status: 401 }
+      );
+    }
+
+    const patient =
+      await prisma.patient.findFirst({
+        where: {
+          profile: {
+            authUserId: userData.user.id,
+          },
+        },
+        select: { id: true },
+      });
+
+    if (!patient) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Patient profile not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    const body = await request.json().catch(() => ({}));
+
+    const {
+      appointmentId,
+      action,
+      appointmentDate,
+    } = body as {
+      appointmentId?: unknown;
+      action?: unknown;
+      appointmentDate?: unknown;
+    };
+
+    if (
+      typeof appointmentId !== "string" ||
+      !appointmentId.trim()
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Appointment ID is required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!["accept", "refuse", "cancel", "propose"].includes(String(action))) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid action.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const existing =
+      await prisma.appointment.findFirst({
+        where: {
+          id: appointmentId,
+          patientId: patient.id,
+        },
+      });
+
+    if (!existing) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Appointment not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    let data: {
+      status?: "CONFIRMED" | "CANCELLED" | "PENDING";
+      appointmentDate?: Date;
+      previousDate?: Date | null;
+    } = {};
+
+    if (action === "accept") {
+      if (existing.status !== "RESCHEDULED") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Nothing to accept.",
+          },
+          { status: 400 }
+        );
+      }
+      data = { status: "CONFIRMED" };
+    } else if (action === "refuse") {
+      if (existing.status !== "RESCHEDULED") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Nothing to refuse.",
+          },
+          { status: 400 }
+        );
+      }
+      data = { status: "CANCELLED" };
+    } else if (action === "cancel") {
+      if (!["PENDING", "CONFIRMED", "RESCHEDULED"].includes(existing.status)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Cannot cancel from ${existing.status}.`,
+          },
+          { status: 400 }
+        );
+      }
+      data = { status: "CANCELLED" };
+    } else {
+      // propose : nouveau créneau du patient -> retour en PENDING.
+      if (!["PENDING", "CONFIRMED"].includes(existing.status)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Cannot propose a new slot from ${existing.status}.`,
+          },
+          { status: 400 }
+        );
+      }
+      const next =
+        typeof appointmentDate === "string"
+          ? new Date(appointmentDate)
+          : null;
+      if (!next || isNaN(next.getTime())) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "A valid new date is required.",
+          },
+          { status: 400 }
+        );
+      }
+      if (next <= new Date()) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Appointment date must be in the future.",
+          },
+          { status: 400 }
+        );
+      }
+      data = {
+        status: "PENDING",
+        appointmentDate: next,
+        previousDate: existing.appointmentDate,
+      };
+    }
+
+    const updated =
+      await prisma.appointment.update({
+        where: { id: appointmentId },
+        data,
+      });
+
+    return NextResponse.json({
+      success: true,
+      appointment: {
+        id: updated.id,
+        date: updated.appointmentDate.toISOString(),
+        previousDate: updated.previousDate
+          ? updated.previousDate.toISOString()
+          : null,
+        status: updated.status,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "PATCH /api/patient/appointments:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Unable to update appointment.",
       },
       { status: 500 }
     );

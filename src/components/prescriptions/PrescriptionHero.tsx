@@ -47,7 +47,7 @@ export default function PrescriptionHero() {
 
           <p className="mt-6 max-w-2xl text-lg leading-8 text-violet-100">
             Manage all your medications, understand each prescription,
-            receive intelligent reminders and let MediConnect AI explain
+            receive intelligent reminders and let DOCTORZ Co. explain
             every treatment prescribed by your healthcare providers.
           </p>
 

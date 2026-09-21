@@ -46,10 +46,10 @@ export interface GeneratePrescriptionOptions {
 }
 
 /**
- * Generates an official, high-quality A4 Medical Prescription PDF in French
- * and triggers immediate client-side download.
+ * Builds the official A4 prescription PDF document (no download).
+ * Use `generatePrescriptionPDF` to build + download.
  */
-export function generatePrescriptionPDF({
+export function buildPrescriptionDoc({
   doctor,
   patient,
   items,
@@ -429,7 +429,7 @@ export function generatePrescriptionPDF({
   doc.setFontSize(7);
   doc.setTextColor(...mutedSlate);
   doc.text(
-    "Document officiel généré par MediConnect AI Santé • Secret Médical Protégé • www.mediconnect.dz",
+    "Document officiel généré par DOCTORZ Co. Santé • Secret Médical Protégé • www.mediconnect.dz",
     marginX,
     pageHeight - 8
   );
@@ -437,12 +437,21 @@ export function generatePrescriptionPDF({
   doc.setFont("helvetica", "bold");
   doc.text("Page 1 / 1", pageWidth - marginX, pageHeight - 8, { align: "right" });
 
-  // Save / Download PDF
-  const sanitizedPatientName = (patient.name || "patient").replace(/[^a-zA-Z0-9]/g, "_");
+  // Doc ready — caller decides (preview, download...).
+  return doc;
+}
+
+/**
+ * Generates the official prescription PDF and triggers
+ * immediate client-side download.
+ */
+export function generatePrescriptionPDF(options: GeneratePrescriptionOptions): jsPDF {
+  const doc = buildPrescriptionDoc(options);
+  const sanitizedPatientName = (options.patient.name || "patient").replace(
+    /[^a-zA-Z0-9]/g,
+    "_"
+  );
   const dateFormatted = new Date().toISOString().split("T")[0];
-  const fileName = `Ordonnance_${sanitizedPatientName}_${dateFormatted}.pdf`;
-
-  doc.save(fileName);
-
+  doc.save(`Ordonnance_${sanitizedPatientName}_${dateFormatted}.pdf`);
   return doc;
 }

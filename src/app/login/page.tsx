@@ -4,9 +4,9 @@ import LoginForm from "@/components/auth/LoginForm";
 import { Sparkles, ArrowLeft, ShieldCheck, Lock } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Sign In | MediConnect AI",
+  title: "Sign In | DOCTORZ Co.",
   description:
-    "Sign in to your MediConnect AI account to manage appointments, consult medical records, or access your clinical provider dashboard.",
+    "Sign in to your DOCTORZ Co. account to manage appointments, consult medical records, or access your clinical provider dashboard.",
 };
 
 export default function LoginPage() {
@@ -41,7 +41,7 @@ export default function LoginPage() {
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-lg font-bold tracking-tight text-slate-900">
-                MediConnect
+                DOCTORZ Co.
               </span>
               <span className="px-1.5 py-0.2 text-[10px] font-bold uppercase rounded bg-violet-100 text-violet-700">
                 AI
@@ -86,7 +86,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-[11px] text-slate-400">
-          © {new Date().getFullYear()} MediConnect AI Inc. All health records are
+          © {new Date().getFullYear()} DOCTORZ Co. Inc. All health records are
           protected under strict medical confidentiality regulations.
         </p>
       </footer>

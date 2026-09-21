@@ -41,7 +41,7 @@ export default function AIPageContent() {
             <div>
 
               <h1 className="text-3xl font-bold text-slate-900">
-                MediConnect AI
+                DOCTORZ Co.
               </h1>
 
               <p className="mt-1 text-slate-500">

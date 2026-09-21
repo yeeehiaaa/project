@@ -4,25 +4,34 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { usePatientTheme } from "@/components/patient/PatientThemeContext";
+import { PButton, PIconButton } from "@/components/patient/buttons";
+import PatientWelcomeBanner from "@/components/patient/PatientWelcomeBanner";
 import {
   Activity,
   AlertCircle,
   ArrowLeft,
+  Calendar,
   CheckCircle2,
   ChevronDown,
   ClipboardList,
   Download,
   Edit3,
+  Eye,
   FileText,
   HeartPulse,
   Loader2,
   Phone,
   Pill,
+  Plus,
   RefreshCw,
   Save,
+  Search,
   ShieldCheck,
   Stethoscope,
   Syringe,
+  Tag,
+  Trash2,
   UserRound,
   X,
 } from "lucide-react";
@@ -118,7 +127,7 @@ type PrescriptionItem = {
 
 type Prescription = {
   id: string;
-  prescribedAt: string;
+  prescribedDate: string;
   status: string;
   notes: string | null;
   doctor: {
@@ -142,7 +151,7 @@ type LaboratoryParameter = {
 type LaboratoryResult = {
   id: string;
   testName: string;
-  resultDate: string;
+  testDate: string;
   status: string;
   laboratoryName: string | null;
   parameters: LaboratoryParameter[];
@@ -151,8 +160,11 @@ type LaboratoryResult = {
 type Vaccination = {
   id: string;
   vaccineName: string;
-  doseNumber: number | null;
-  administeredAt: string;
+  dose: string | null;
+  vaccinationDate: string;
+  nextDueDate: string | null;
+  provider: string | null;
+  batchNumber: string | null;
   notes: string | null;
 };
 
@@ -328,19 +340,20 @@ function SectionHeader({
   title: string;
   description?: string;
 }) {
+  const { isDark } = usePatientTheme();
   return (
     <div className="mb-6 flex items-start gap-4">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
+      <div className={isDark ? "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-300" : "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-600"}>
         {icon}
       </div>
 
       <div>
-        <h2 className="text-lg font-bold text-slate-900">
+        <h2 className={isDark ? "text-lg font-bold text-white" : "text-lg font-bold text-slate-900"}>
           {title}
         </h2>
 
         {description && (
-          <p className="mt-1 text-sm text-slate-500">
+          <p className={isDark ? "mt-1 text-sm text-slate-400" : "mt-1 text-sm text-slate-500"}>
             {description}
           </p>
         )}
@@ -357,8 +370,9 @@ function FieldLabel({
   children: React.ReactNode;
   optional?: boolean;
 }) {
+  const { isDark } = usePatientTheme();
   return (
-    <label className="mb-2 block text-sm font-semibold text-slate-700">
+    <label className={isDark ? "mb-2 block text-sm font-semibold text-slate-200" : "mb-2 block text-sm font-semibold text-slate-700"}>
       {children}
 
       {optional && (
@@ -385,6 +399,7 @@ function TextInput({
   type?: string;
   optional?: boolean;
 }) {
+  const { isDark } = usePatientTheme();
   return (
     <div>
       <FieldLabel optional={optional}>{label}</FieldLabel>
@@ -394,7 +409,7 @@ function TextInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+        className={isDark ? "h-12 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 text-sm text-white outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-500/20" : "h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-100"}
       />
     </div>
   );
@@ -415,6 +430,7 @@ function TextArea({
   optional?: boolean;
   rows?: number;
 }) {
+  const { isDark } = usePatientTheme();
   return (
     <div>
       <FieldLabel optional={optional}>{label}</FieldLabel>
@@ -424,7 +440,7 @@ function TextArea({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+        className={isDark ? "w-full resize-none rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-500/20" : "w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-100"}
       />
     </div>
   );
@@ -445,6 +461,7 @@ function SelectInput({
   placeholder?: string;
   optional?: boolean;
 }) {
+  const { isDark } = usePatientTheme();
   return (
     <div>
       <FieldLabel optional={optional}>{label}</FieldLabel>
@@ -453,7 +470,7 @@ function SelectInput({
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="h-12 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 pr-10 text-sm text-slate-900 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+          className={isDark ? "h-12 w-full appearance-none rounded-2xl border border-slate-700 bg-slate-950 px-4 pr-10 text-sm text-white outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-500/20" : "h-12 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 pr-10 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"}
         >
           <option value="">{placeholder}</option>
 
@@ -478,6 +495,7 @@ function SelectInput({
 ============================================================ */
 
 export default function MedicalRecordPage() {
+  const { isDark } = usePatientTheme();
   const [data, setData] =
     useState<MedicalRecordResponse | null>(null);
 
@@ -494,6 +512,49 @@ export default function MedicalRecordPage() {
 
   const [successMessage, setSuccessMessage] =
     useState<string | null>(null);
+
+  /* ============================================================
+     RECORDS VIEW STATE (lab-style)
+  ============================================================ */
+
+  const [activeView, setActiveView] =
+    useState<"records" | "profile">("records");
+
+  const [recordSearch, setRecordSearch] =
+    useState("");
+
+  const [isRefreshing, setIsRefreshing] =
+    useState(false);
+
+  const [showAddModal, setShowAddModal] =
+    useState(false);
+
+  const [addDate, setAddDate] = useState(
+    todayInputValue()
+  );
+
+  const [addTitle, setAddTitle] = useState("");
+  const [addSymptoms, setAddSymptoms] =
+    useState("");
+
+  const [addDiagnosis, setAddDiagnosis] =
+    useState("");
+
+  const [addNotes, setAddNotes] = useState("");
+
+  const [isAddingRecord, setIsAddingRecord] =
+    useState(false);
+
+  const [addError, setAddError] = useState<
+    string | null
+  >(null);
+
+  const [selectedRecord, setSelectedRecord] =
+    useState<MedicalRecord | null>(null);
+
+  const [deletingId, setDeletingId] = useState<
+    string | null
+  >(null);
 
   /* ============================================================
      LOAD
@@ -648,6 +709,276 @@ export default function MedicalRecordPage() {
   }
 
   /* ============================================================
+     PERSONAL RECORDS (lab-style view)
+  ============================================================ */
+
+  function todayInputValue(): string {
+    const d = new Date();
+
+    return `${d.getFullYear()}-${String(
+      d.getMonth() + 1
+    ).padStart(2, "0")}-${String(
+      d.getDate()
+    ).padStart(2, "0")}`;
+  }
+
+  function symptomTags(
+    symptoms: string | null
+  ): string[] {
+    if (!symptoms) return [];
+
+    return symptoms
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  const filteredRecords = useMemo(() => {
+    const q = recordSearch
+      .trim()
+      .toLowerCase();
+
+    const records =
+      data?.medicalRecords ?? [];
+
+    if (!q) return records;
+
+    return records.filter((record) => {
+      if (
+        record.title
+          .toLowerCase()
+          .includes(q)
+      )
+        return true;
+
+      if (
+        record.diagnosis &&
+        record.diagnosis
+          .toLowerCase()
+          .includes(q)
+      )
+        return true;
+
+      if (
+        record.symptoms &&
+        record.symptoms
+          .toLowerCase()
+          .includes(q)
+      )
+        return true;
+
+      if (
+        record.doctor &&
+        `${record.doctor.firstName} ${record.doctor.lastName}`
+          .toLowerCase()
+          .includes(q)
+      )
+        return true;
+
+      return false;
+    });
+  }, [data, recordSearch]);
+
+  function resetAddForm() {
+    setAddDate(todayInputValue());
+    setAddTitle("");
+    setAddSymptoms("");
+    setAddDiagnosis("");
+    setAddNotes("");
+    setAddError(null);
+  }
+
+  async function refreshRecords() {
+    if (isRefreshing) return;
+
+    setIsRefreshing(true);
+
+    try {
+      const {
+        data: sessionData,
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (
+        sessionError ||
+        !sessionData.session
+      ) {
+        throw new Error(
+          "Your session has expired. Please sign in again."
+        );
+      }
+
+      const response = await fetch(
+        "/api/dashboard/patient/medical-record",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+          cache: "no-store",
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Failed to load your medical record."
+        );
+      }
+
+      setData(result);
+      setForm(toForm(result.patient));
+    } catch (err) {
+      console.error(
+        "Medical record refresh error:",
+        err
+      );
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+
+  async function handleAddRecord() {
+    if (isAddingRecord) return;
+
+    setAddError(null);
+
+    if (!addTitle.trim()) {
+      setAddError(
+        "Please provide a title for the record."
+      );
+
+      return;
+    }
+
+    setIsAddingRecord(true);
+
+    try {
+      const {
+        data: sessionData,
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (
+        sessionError ||
+        !sessionData.session
+      ) {
+        throw new Error(
+          "Your session has expired. Please sign in again."
+        );
+      }
+
+      const response = await fetch(
+        "/api/dashboard/patient/medical-record",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+          body: JSON.stringify({
+            title: addTitle.trim(),
+            recordDate: addDate || undefined,
+            symptoms:
+              addSymptoms.trim() || undefined,
+            diagnosis:
+              addDiagnosis.trim() || undefined,
+            notes: addNotes.trim() || undefined,
+          }),
+        }
+      );
+
+      const result = await response
+        .json()
+        .catch(() => ({}));
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.error ||
+            "Unable to save the record."
+        );
+      }
+
+      setShowAddModal(false);
+      resetAddForm();
+      await loadMedicalRecord();
+    } catch (err) {
+      setAddError(
+        err instanceof Error
+          ? err.message
+          : "Unable to save the record."
+      );
+    } finally {
+      setIsAddingRecord(false);
+    }
+  }
+
+  async function handleDeleteRecord(
+    id: string
+  ) {
+    if (
+      !confirm("Delete this personal record?")
+    )
+      return;
+
+    setDeletingId(id);
+
+    try {
+      const {
+        data: sessionData,
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (
+        sessionError ||
+        !sessionData.session
+      ) {
+        throw new Error(
+          "Your session has expired. Please sign in again."
+        );
+      }
+
+      const response = await fetch(
+        `/api/dashboard/patient/medical-record?id=${encodeURIComponent(
+          id
+        )}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+        }
+      );
+
+      const result = await response
+        .json()
+        .catch(() => ({}));
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.error ||
+            "Unable to delete the record."
+        );
+      }
+
+      if (selectedRecord?.id === id) {
+        setSelectedRecord(null);
+      }
+
+      await loadMedicalRecord();
+    } catch (err) {
+      console.error(
+        "Delete record error:",
+        err
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  /* ============================================================
      DERIVED DATA
   ============================================================ */
 
@@ -692,16 +1023,8 @@ export default function MedicalRecordPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[70vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100">
-            <Loader2 className="h-7 w-7 animate-spin text-violet-600" />
-          </div>
-
-          <p className="text-sm font-medium text-slate-500">
-            Loading your medical record...
-          </p>
-        </div>
+      <div className="flex min-h-[300px] items-center justify-center">
+        <Loader2 className="animate-spin text-blue-500" size={28} />
       </div>
     );
   }
@@ -728,7 +1051,7 @@ export default function MedicalRecordPage() {
 
           <button
             onClick={loadMedicalRecord}
-            className="mt-6 inline-flex h-11 items-center gap-2 rounded-2xl bg-violet-600 px-5 text-sm font-semibold text-white transition hover:bg-violet-700"
+            className="mt-6 inline-flex h-11 items-center gap-2 rounded-2xl bg-sky-600 px-5 text-sm font-semibold text-white transition hover:bg-sky-700 cursor-pointer active:scale-[0.97]"
           >
             <RefreshCw className="h-4 w-4" />
             Try again
@@ -807,7 +1130,7 @@ const handleDownloadPDF = () => {
     doc.setFontSize(20);
 
     doc.text(
-      "MediConnect AI",
+      "DOCTORZ Co.",
       15,
       14
     );
@@ -860,7 +1183,7 @@ const handleDownloadPDF = () => {
       );
 
       doc.text(
-        "MediConnect AI — Document médical personnel",
+        "DOCTORZ Co. — Document médical personnel",
         15,
         pageHeight - 9
       );
@@ -1416,7 +1739,7 @@ const handleDownloadPDF = () => {
       body: data.prescriptions.map(
         (prescription) => [
           formatPDFDate(
-            prescription.prescribedAt
+            prescription.prescribedDate
           ),
 
           value(
@@ -1492,7 +1815,7 @@ const handleDownloadPDF = () => {
       body: data.laboratoryResults.map(
         (result) => [
           formatPDFDate(
-            result.resultDate
+            result.testDate
           ),
           value(result.testName),
           value(result.status),
@@ -1553,12 +1876,12 @@ const handleDownloadPDF = () => {
           ),
 
           formatPDFDate(
-            vaccination.administeredAt
+            vaccination.vaccinationDate
           ),
 
-          vaccination.doseNumber
+          vaccination.dose
             ? String(
-                vaccination.doseNumber
+                vaccination.dose
               )
             : "Non renseigné",
         ]
@@ -1600,30 +1923,30 @@ const handleDownloadPDF = () => {
 
 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
   <div>
-    <div className="mb-2 flex items-center gap-2 text-sm font-medium text-violet-600">
+    <div className="mb-2 flex items-center gap-2 text-sm font-medium text-sky-600">
       <HeartPulse className="h-4 w-4" />
       Personal Health
     </div>
 
-    <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+    <h1 className={isDark ? "text-3xl font-bold tracking-tight text-white" : "text-3xl font-bold tracking-tight text-slate-900"}>
       Medical Record
     </h1>
 
-    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+    <p className={isDark ? "mt-2 max-w-2xl text-sm leading-6 text-slate-400" : "mt-2 max-w-2xl text-sm leading-6 text-slate-500"}>
       Keep your medical information up to date so
       healthcare professionals can better understand
       your health history.
     </p>
   </div>
 
-  {!editing && (
+  {!editing && activeView === "profile" && (
     <div className="flex flex-wrap items-center gap-3">
       {/* Download PDF */}
       <button
         type="button"
         onClick={handleDownloadPDF}
         disabled={!data?.profile || !data?.patient}
-        className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-violet-200 bg-white px-5 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+        className={isDark ? "inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-sky-700 bg-slate-900 px-5 text-sm font-semibold text-sky-300 transition hover:bg-sky-500/10 cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50" : "inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-white px-5 text-sm font-semibold text-sky-700 transition hover:bg-sky-50 cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"}
       >
         <Download className="h-4 w-4" />
         Download PDF
@@ -1637,7 +1960,7 @@ const handleDownloadPDF = () => {
           setEditing(true);
           setSuccessMessage(null);
         }}
-        className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 text-sm font-semibold text-white shadow-lg shadow-violet-200 transition hover:scale-[1.01] hover:shadow-xl"
+        className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-600 to-blue-600 px-5 text-sm font-semibold text-white transition hover:scale-[1.01] hover:from-blue-600 hover:to-sky-400 cursor-pointer active:scale-[0.97]"
       >
         <Edit3 className="h-4 w-4" />
         Edit medical information
@@ -1673,81 +1996,608 @@ const handleDownloadPDF = () => {
           PATIENT HERO
       ======================================================== */}
 
-      <section className="relative overflow-hidden rounded-[30px] bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 p-7 text-white shadow-xl shadow-violet-200/50">
-        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
-        <div className="absolute -bottom-32 left-1/3 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+      {/* ========================================================
+           VIEW SWITCHER
+      ======================================================== */}
 
-        <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-5">
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-white/20 bg-white/15 text-xl font-bold backdrop-blur">
-              {data.profile.avatarUrl ? (
-                <img
-                  src={data.profile.avatarUrl}
-                  alt={`${data.profile.firstName} ${data.profile.lastName}`}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                getInitials(
-                  data.profile.firstName,
-                  data.profile.lastName
-                )
-              )}
-            </div>
+      {!editing && (
+        <div className={isDark ? "inline-flex rounded-2xl border border-slate-800 bg-slate-900/80 p-1" : "inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm"}>
+          <button
+            type="button"
+            onClick={() => setActiveView("records")}
+            className={activeView === "records" ? "rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-500 cursor-pointer active:scale-[0.97]" : isDark ? "rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 transition hover:text-white hover:bg-white/10 cursor-pointer active:scale-[0.97]" : "rounded-xl px-4 py-2 text-xs font-semibold text-slate-500 transition hover:text-slate-900 hover:bg-slate-100 cursor-pointer active:scale-[0.97]"}
+          >
+            My records
+          </button>
 
-            <div>
-              <p className="text-sm font-medium text-white/70">
-                Patient
-              </p>
+          <button
+            type="button"
+            onClick={() => setActiveView("profile")}
+            className={activeView === "profile" ? "rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-500 cursor-pointer active:scale-[0.97]" : isDark ? "rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 transition hover:text-white hover:bg-white/10 cursor-pointer active:scale-[0.97]" : "rounded-xl px-4 py-2 text-xs font-semibold text-slate-500 transition hover:text-slate-900 hover:bg-slate-100 cursor-pointer active:scale-[0.97]"}
+          >
+            Health profile
+          </button>
+        </div>
+      )}
 
-              <h2 className="mt-1 text-2xl font-bold">
-                {data.profile.firstName}{" "}
-                {data.profile.lastName}
-              </h2>
+      {/* ========================================================
+           MY RECORDS (lab-style)
+      ======================================================== */}
 
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-white/75">
-                {age !== null && (
-                  <span>{age} years old</span>
-                )}
+      {activeView === "records" && !editing && (
+        <div className="space-y-6">
+          {/* Header card */}
+          <div
+            className={`p-6 rounded-3xl border shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors ${
+              isDark ? "bg-slate-900/80 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`h-12 w-12 rounded-2xl flex items-center justify-center border ${isDark ? "bg-blue-500/15 border-blue-500/30 text-blue-300" : "bg-blue-50 border-blue-200 text-blue-600"}`}>
+                <Stethoscope size={24} />
+              </div>
 
-                {data.profile.city && (
-                  <span>• {data.profile.city}</span>
-                )}
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold">My Medical Records</h2>
 
-                {data.profile.wilaya && (
-                  <span>• {data.profile.wilaya}</span>
-                )}
+                <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                  {data?.medicalRecords.length ?? 0} record{(data?.medicalRecords.length ?? 0) > 1 ? "s" : ""} available
+                </p>
               </div>
             </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Search */}
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+
+                <input
+                  type="text"
+                  placeholder="Search title, diagnosis..."
+                  value={recordSearch}
+                  onChange={(e) => setRecordSearch(e.target.value)}
+                  className={`pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none transition w-56 ${
+                    isDark
+                      ? "bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500"
+                      : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500"
+                  }`}
+                />
+
+                {recordSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setRecordSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition cursor-pointer active:scale-[0.97]"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              {/* Refresh */}
+              <PIconButton
+                title="Refresh"
+                isDark={isDark}
+                disabled={isRefreshing}
+                onClick={refreshRecords}
+              >
+                <RefreshCw size={14} className={isRefreshing ? "animate-spin text-blue-500" : ""} />
+              </PIconButton>
+
+              {/* Export PDF */}
+              <PButton
+                variant="secondary"
+                isDark={isDark}
+                disabled={!data?.profile || !data?.patient}
+                title="Export PDF"
+                onClick={handleDownloadPDF}
+              >
+                <Download size={14} />
+                <span>Export PDF</span>
+              </PButton>
+
+              {/* Add record */}
+              <PButton
+                variant="primary"
+                isDark={isDark}
+                onClick={() => {
+                  resetAddForm();
+                  setShowAddModal(true);
+                }}
+              >
+                <Plus size={15} />
+                <span>Add record</span>
+              </PButton>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-white/15 bg-white/10 px-5 py-4 backdrop-blur">
-            <p className="text-xs font-medium uppercase tracking-wider text-white/60">
-              Last updated
-            </p>
+          {/* Cards grid / empty state */}
+          {filteredRecords.length === 0 ? (
+            <div className={`p-12 text-center rounded-3xl border ${isDark ? "bg-slate-900/40 border-slate-800" : "bg-white border-slate-200"}`}>
+              <Stethoscope size={32} className="mx-auto text-slate-400 opacity-50" />
 
-            <p className="mt-1 text-sm font-semibold">
-              {formatDate(data.patient.updatedAt)}
-            </p>
-          </div>
+              <h3 className="mt-3 text-base font-bold">No medical records found</h3>
+
+              <p className="mt-1 text-xs text-slate-400 max-w-md mx-auto">
+                {recordSearch
+                  ? `No record matches "${recordSearch}". Try another title, diagnosis or doctor name.`
+                  : "Your consultation records and personal entries will appear here. Add your first personal entry using the button above."}
+              </p>
+
+              {recordSearch ? (
+                <PButton
+                  variant="primary"
+                  isDark={isDark}
+                  className="mt-4"
+                  onClick={() => setRecordSearch("")}
+                >
+                  Clear search
+                </PButton>
+              ) : (
+                <PButton
+                  variant="primary"
+                  isDark={isDark}
+                  className="mt-4"
+                  onClick={() => {
+                    resetAddForm();
+                    setShowAddModal(true);
+                  }}
+                >
+                  Add record
+                </PButton>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredRecords.map((record) => (
+                <div
+                  key={record.id}
+                  onClick={() => setSelectedRecord(record)}
+                  className={`p-5 rounded-3xl border shadow-xs transition flex flex-col justify-between gap-4 cursor-pointer ${
+                    isDark ? "bg-slate-900/85 border-slate-800 hover:border-blue-500/50" : "bg-white border-slate-200 hover:border-blue-300"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className={`text-sm font-bold truncate ${isDark ? "text-white" : "text-slate-900"}`}>
+                          {record.title}
+                        </h3>
+
+                        <p className={`mt-1 text-[11px] flex items-center gap-1.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                          <Calendar size={11} />
+
+                          <span>
+                            {new Date(record.recordDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                          </span>
+                        </p>
+
+                        <div className="mt-2">
+                          {record.doctor ? (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${isDark ? "bg-blue-500/15 text-blue-300 border-blue-500/30" : "bg-blue-50 text-blue-700 border-blue-200"}`}>
+                              <Stethoscope size={10} />
+                              Dr. {record.doctor.firstName} {record.doctor.lastName}
+                              {record.doctor.specialties.length > 0 && (
+                                <span className="font-normal opacity-80">• {record.doctor.specialties[0]}</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-emerald-50 text-emerald-700 border-emerald-200"}`}>
+                              <FileText size={10} />
+                              Personal entry
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedRecord(record);
+                          }}
+                          title="View"
+                          className={`p-1.5 rounded-lg border transition cursor-pointer active:scale-[0.97] ${isDark ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700" : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"}`}
+                        >
+                          <Eye size={14} />
+                        </button>
+
+                        {record.doctor === null && (
+                          <button
+                            type="button"
+                            disabled={deletingId === record.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteRecord(record.id);
+                            }}
+                            title="Delete"
+                            className={`p-1.5 rounded-lg transition cursor-pointer active:scale-[0.97] disabled:opacity-50 ${isDark ? "text-slate-500 hover:text-rose-400 hover:bg-rose-500/10" : "text-slate-400 hover:text-rose-600 hover:bg-rose-50"}`}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {record.diagnosis && (
+                      <p className={`mt-3 text-xs font-medium ${isDark ? "text-slate-200" : "text-slate-700"}`}>
+                        {record.diagnosis}
+                      </p>
+                    )}
+
+                    {symptomTags(record.symptoms).length > 0 && (
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                        {symptomTags(record.symptoms).map((tag) => (
+                          <span
+                            key={tag}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border ${
+                              isDark ? "bg-blue-500/15 text-blue-300 border-blue-500/30" : "bg-blue-50 text-blue-700 border-blue-200"
+                            }`}
+                          >
+                            <Tag size={10} />
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {record.notes && (
+                      <p className={`mt-2 text-[11px] italic line-clamp-2 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                        {record.notes}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ADD MODAL */}
+          {showAddModal && (
+            <div
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !isAddingRecord) setShowAddModal(false);
+              }}
+              className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            >
+              <div
+                className={`w-full max-w-2xl rounded-3xl border shadow-2xl overflow-hidden flex flex-col max-h-[92vh] ${
+                  isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-200 text-slate-900"
+                }`}
+              >
+                {/* Header */}
+                <div className={`p-5 border-b flex items-center justify-between ${isDark ? "border-slate-800 bg-slate-950/50" : "border-slate-100 bg-slate-50"}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-2xl bg-blue-600 text-white shadow-md">
+                      <Stethoscope size={18} />
+                    </div>
+
+                    <div>
+                      <h3 className="font-bold text-base">New medical record</h3>
+
+                      <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                        Add a personal health entry to your file
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isAddingRecord}
+                    onClick={() => setShowAddModal(false)}
+                    className={`p-2 rounded-xl transition cursor-pointer active:scale-[0.97] ${isDark ? "hover:bg-slate-800 text-slate-400" : "hover:bg-slate-200 text-slate-600"}`}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="p-5 sm:p-6 overflow-y-auto space-y-5 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                        Record date
+                      </label>
+
+                      <input
+                        type="date"
+                        value={addDate}
+                        max={todayInputValue()}
+                        onChange={(e) => setAddDate(e.target.value)}
+                        className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none transition ${
+                          isDark ? "bg-slate-950 border-slate-700 text-white focus:border-blue-500" : "bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500"
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                        Title
+                      </label>
+
+                      <input
+                        type="text"
+                        placeholder="Ex: Migraine episode, Flu symptoms..."
+                        value={addTitle}
+                        onChange={(e) => setAddTitle(e.target.value)}
+                        className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none transition ${
+                          isDark ? "bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500" : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500"
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                      Symptoms
+                    </label>
+
+                    <input
+                      type="text"
+                      placeholder="Ex: headache, fever, fatigue"
+                      value={addSymptoms}
+                      onChange={(e) => setAddSymptoms(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none transition ${
+                        isDark ? "bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500" : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500"
+                      }`}
+                    />
+
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Separate symptoms with commas.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                      Diagnosis (optional)
+                    </label>
+
+                    <input
+                      type="text"
+                      placeholder="Ex: suspected migraine..."
+                      value={addDiagnosis}
+                      onChange={(e) => setAddDiagnosis(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none transition ${
+                        isDark ? "bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500" : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                      Notes (optional)
+                    </label>
+
+                    <textarea
+                      rows={3}
+                      placeholder="Any additional details about this entry..."
+                      value={addNotes}
+                      onChange={(e) => setAddNotes(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none transition resize-none ${
+                        isDark ? "bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500" : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500"
+                      }`}
+                    />
+                  </div>
+
+                  {addError && (
+                    <div className="p-3 rounded-xl text-[11px] font-semibold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                      {addError}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className={`p-4 border-t flex items-center justify-end gap-2.5 ${isDark ? "border-slate-800 bg-slate-950/50" : "border-slate-100 bg-slate-50"}`}>
+                  <button
+                    type="button"
+                    disabled={isAddingRecord}
+                    onClick={() => setShowAddModal(false)}
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer active:scale-[0.97] ${isDark ? "hover:bg-slate-800 text-slate-300" : "hover:bg-slate-200 text-slate-600"}`}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isAddingRecord}
+                    onClick={handleAddRecord}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white text-xs font-semibold transition cursor-pointer active:scale-[0.97]"
+                  >
+                    {isAddingRecord ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                    <span>{isAddingRecord ? "Saving..." : "Save record"}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DETAIL MODAL */}
+          {selectedRecord && (
+            <div
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setSelectedRecord(null);
+              }}
+              className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            >
+              <div
+                className={`w-full max-w-2xl rounded-3xl border shadow-2xl overflow-hidden flex flex-col max-h-[92vh] ${
+                  isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-200 text-slate-900"
+                }`}
+              >
+                {/* Header */}
+                <div className={`p-5 border-b flex items-center justify-between ${isDark ? "border-slate-800 bg-slate-950/50" : "border-slate-100 bg-slate-50"}`}>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2.5 rounded-2xl bg-blue-600 text-white shadow-md shrink-0">
+                      <FileText size={18} />
+                    </div>
+
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-base truncate">{selectedRecord.title}</h3>
+
+                      <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                        {new Date(selectedRecord.recordDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRecord(null)}
+                    className={`p-2 rounded-xl transition cursor-pointer active:scale-[0.97] shrink-0 ${isDark ? "hover:bg-slate-800 text-slate-400" : "hover:bg-slate-200 text-slate-600"}`}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="p-5 sm:p-6 overflow-y-auto space-y-5 text-xs">
+                  <div>
+                    {selectedRecord.doctor ? (
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${isDark ? "bg-blue-500/15 text-blue-300 border-blue-500/30" : "bg-blue-50 text-blue-700 border-blue-200"}`}>
+                        <Stethoscope size={10} />
+                        Dr. {selectedRecord.doctor.firstName} {selectedRecord.doctor.lastName}
+                        {selectedRecord.doctor.specialties.length > 0 && (
+                          <span className="font-normal opacity-80">• {selectedRecord.doctor.specialties.join(", ")}</span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-emerald-50 text-emerald-700 border-emerald-200"}`}>
+                        <FileText size={10} />
+                        Personal entry
+                      </span>
+                    )}
+
+                    {selectedRecord.doctor && (
+                      <p className="mt-2 text-[11px] text-slate-400">
+                        Written by your doctor — read-only.
+                      </p>
+                    )}
+                  </div>
+
+                  {selectedRecord.diagnosis && (
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                        Diagnosis
+                      </p>
+
+                      <p className={`text-xs leading-6 ${isDark ? "text-slate-200" : "text-slate-700"}`}>
+                        {selectedRecord.diagnosis}
+                      </p>
+                    </div>
+                  )}
+
+                  {symptomTags(selectedRecord.symptoms).length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                        Symptoms
+                      </p>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        {symptomTags(selectedRecord.symptoms).map((tag) => (
+                          <span
+                            key={tag}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border ${
+                              isDark ? "bg-blue-500/15 text-blue-300 border-blue-500/30" : "bg-blue-50 text-blue-700 border-blue-200"
+                            }`}
+                          >
+                            <Tag size={10} />
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedRecord.notes && (
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                        Notes
+                      </p>
+
+                      <p className={`text-xs leading-6 whitespace-pre-wrap ${isDark ? "text-slate-200" : "text-slate-700"}`}>
+                        {selectedRecord.notes}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className={`p-4 border-t flex items-center justify-end gap-2.5 ${isDark ? "border-slate-800 bg-slate-950/50" : "border-slate-100 bg-slate-50"}`}>
+                  {selectedRecord.doctor === null && (
+                    <button
+                      type="button"
+                      disabled={deletingId === selectedRecord.id}
+                      onClick={() => handleDeleteRecord(selectedRecord.id)}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-60 text-white text-xs font-semibold transition cursor-pointer active:scale-[0.97]"
+                    >
+                      <Trash2 size={14} />
+                      <span>Delete</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRecord(null)}
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer active:scale-[0.97] ${isDark ? "hover:bg-slate-800 text-slate-300" : "hover:bg-slate-200 text-slate-600"}`}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      </section>
+      )}
+
+      {activeView === "profile" && (
+      <>
+      <PatientWelcomeBanner
+        patient={{
+          firstName: data.profile.firstName,
+          lastName: data.profile.lastName,
+          email: data.profile.email,
+          phone: data.profile.phone,
+          city: data.profile.city,
+          wilaya: data.profile.wilaya,
+          avatarUrl: data.profile.avatarUrl,
+          accountStatus: (data.profile as any).accountStatus || "ACTIVE",
+          bloodType: data.patient.bloodType,
+        }}
+        stats={{
+          upcomingAppointments: (data.appointments || []).filter(
+            (a: any) =>
+              new Date(a.appointmentDate) >= new Date() &&
+              a.status !== "CANCELLED" &&
+              a.status !== "NO_SHOW"
+          ).length,
+          activePrescriptions: (data.prescriptions || []).filter(
+            (p: any) => p.status === "ACTIVE"
+          ).length,
+          pendingLabs: (data.laboratoryResults || []).filter((l: any) =>
+            ["PENDING", "PROCESSING"].includes(l.status)
+          ).length,
+        }}
+        isDark={isDark}
+        showActions={false}
+      />
 
       {/* ========================================================
           FIRST TIME / EMPTY STATE
       ======================================================== */}
 
       {!hasMedicalInformation && !editing && (
-        <section className="rounded-[30px] border border-violet-100 bg-white p-8 shadow-sm">
+        <section className={isDark ? "rounded-[30px] border border-sky-800 bg-slate-900/80 p-8 shadow-sm" : "rounded-[30px] border border-sky-100 bg-white p-8 shadow-sm"}>
           <div className="mx-auto max-w-2xl text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-violet-100 text-violet-600">
+            <div className={isDark ? "mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-sky-500/20 text-sky-300" : "mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-sky-100 text-sky-600"}>
               <ClipboardList className="h-8 w-8" />
             </div>
 
-            <h2 className="mt-5 text-2xl font-bold text-slate-900">
+            <h2 className={isDark ? "mt-5 text-2xl font-bold text-white" : "mt-5 text-2xl font-bold text-slate-900"}>
               Complete your medical record
             </h2>
 
-            <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-slate-500">
+            <p className={isDark ? "mx-auto mt-3 max-w-xl text-sm leading-7 text-slate-400" : "mx-auto mt-3 max-w-xl text-sm leading-7 text-slate-500"}>
               Add your allergies, medical history,
               medications, lifestyle information and
               emergency contact. You can update these
@@ -1759,7 +2609,7 @@ const handleDownloadPDF = () => {
                 setEditing(true);
                 setSuccessMessage(null);
               }}
-              className="mt-6 inline-flex h-12 items-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 text-sm font-semibold text-white shadow-lg shadow-violet-200 transition hover:scale-[1.01]"
+              className="mt-6 inline-flex h-12 items-center gap-2 rounded-2xl bg-gradient-to-r from-sky-600 to-blue-600 px-6 text-sm font-semibold text-white transition hover:scale-[1.01] hover:from-blue-600 hover:to-sky-400 cursor-pointer active:scale-[0.97]"
             >
               <FileText className="h-4 w-4" />
               Complete my medical record
@@ -1776,7 +2626,7 @@ const handleDownloadPDF = () => {
         <div className="space-y-6">
           {/* MEDICAL INFORMATION */}
 
-          <section className="rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm">
+          <section className={isDark ? "rounded-[30px] border border-slate-800 bg-slate-900/80 p-7 shadow-sm" : "rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm"}>
             <SectionHeader
               icon={<HeartPulse className="h-5 w-5" />}
               title="Medical information"
@@ -1900,7 +2750,7 @@ const handleDownloadPDF = () => {
 
           {/* LIFESTYLE */}
 
-          <section className="rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm">
+          <section className={isDark ? "rounded-[30px] border border-slate-800 bg-slate-900/80 p-7 shadow-sm" : "rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm"}>
             <SectionHeader
               icon={<Activity className="h-5 w-5" />}
               title="Lifestyle"
@@ -2023,7 +2873,7 @@ const handleDownloadPDF = () => {
 
           {/* EMERGENCY */}
 
-          <section className="rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm">
+          <section className={isDark ? "rounded-[30px] border border-slate-800 bg-slate-900/80 p-7 shadow-sm" : "rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm"}>
             <SectionHeader
               icon={<Phone className="h-5 w-5" />}
               title="Emergency contact"
@@ -2075,7 +2925,7 @@ const handleDownloadPDF = () => {
 
           {/* GUARDIAN */}
 
-          <section className="rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm">
+          <section className={isDark ? "rounded-[30px] border border-slate-800 bg-slate-900/80 p-7 shadow-sm" : "rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm"}>
             <SectionHeader
               icon={<ShieldCheck className="h-5 w-5" />}
               title="Parent / guardian"
@@ -2154,7 +3004,7 @@ const handleDownloadPDF = () => {
 
           {/* ACTIONS */}
 
-          <div className="sticky bottom-5 z-10 flex flex-col gap-3 rounded-3xl border border-slate-100 bg-white/95 p-4 shadow-2xl backdrop-blur md:flex-row md:justify-end">
+          <div className={isDark ? "sticky bottom-5 z-10 flex flex-col gap-3 rounded-3xl border border-slate-800 bg-slate-900/95 p-4 shadow-2xl backdrop-blur md:flex-row md:justify-end" : "sticky bottom-5 z-10 flex flex-col gap-3 rounded-3xl border border-slate-100 bg-white/95 p-4 shadow-2xl backdrop-blur md:flex-row md:justify-end"}>
             <button
               onClick={() => {
                 setForm(toForm(data.patient));
@@ -2162,7 +3012,7 @@ const handleDownloadPDF = () => {
                 setError(null);
               }}
               disabled={saving}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className={isDark ? "inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-700 bg-slate-900 px-6 text-sm font-semibold text-slate-200 transition hover:bg-slate-800 cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50" : "inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"}
             >
               <X className="h-4 w-4" />
               Cancel
@@ -2171,7 +3021,7 @@ const handleDownloadPDF = () => {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-7 text-sm font-semibold text-white shadow-lg shadow-violet-200 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-600 to-blue-600 px-7 text-sm font-semibold text-white transition hover:scale-[1.01] hover:from-blue-600 hover:to-sky-400 cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? (
                 <>
@@ -2197,7 +3047,7 @@ const handleDownloadPDF = () => {
         <>
           {/* MEDICAL OVERVIEW */}
 
-          <section className="rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm">
+          <section className={isDark ? "rounded-[30px] border border-slate-800 bg-slate-900/80 p-7 shadow-sm" : "rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm"}>
             <div className="mb-6 flex items-center justify-between">
               <SectionHeader
                 icon={<HeartPulse className="h-5 w-5" />}
@@ -2210,7 +3060,7 @@ const handleDownloadPDF = () => {
                   setForm(toForm(data.patient));
                   setEditing(true);
                 }}
-                className="hidden items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-violet-600 transition hover:bg-violet-50 sm:flex"
+                className={isDark ? "hidden items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-sky-300 transition hover:bg-sky-500/10 cursor-pointer active:scale-[0.97] sm:flex" : "hidden items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-sky-600 transition hover:bg-sky-50 cursor-pointer active:scale-[0.97] sm:flex"}
               >
                 <Edit3 className="h-4 w-4" />
                 Edit
@@ -2260,7 +3110,7 @@ const handleDownloadPDF = () => {
 
           {/* HISTORY */}
 
-          <section className="rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm">
+          <section className={isDark ? "rounded-[30px] border border-slate-800 bg-slate-900/80 p-7 shadow-sm" : "rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm"}>
             <SectionHeader
               icon={<ClipboardList className="h-5 w-5" />}
               title="Medical history"
@@ -2295,7 +3145,7 @@ const handleDownloadPDF = () => {
 
           {/* LIFESTYLE */}
 
-          <section className="rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm">
+          <section className={isDark ? "rounded-[30px] border border-slate-800 bg-slate-900/80 p-7 shadow-sm" : "rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm"}>
             <SectionHeader
               icon={<Activity className="h-5 w-5" />}
               title="Lifestyle"
@@ -2340,12 +3190,12 @@ const handleDownloadPDF = () => {
             </div>
 
             {data.patient.additionalMedicalInfo && (
-              <div className="mt-5 rounded-2xl bg-slate-50 p-5">
+              <div className={isDark ? "mt-5 rounded-2xl bg-slate-950/60 p-5" : "mt-5 rounded-2xl bg-slate-50 p-5"}>
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                   Additional information
                 </p>
 
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">
+                <p className={isDark ? "mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-200" : "mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700"}>
                   {data.patient.additionalMedicalInfo}
                 </p>
               </div>
@@ -2356,7 +3206,7 @@ const handleDownloadPDF = () => {
 
           {(data.patient.emergencyContactName ||
             data.patient.emergencyContactPhone) && (
-            <section className="rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm">
+            <section className={isDark ? "rounded-[30px] border border-slate-800 bg-slate-900/80 p-7 shadow-sm" : "rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm"}>
               <SectionHeader
                 icon={<Phone className="h-5 w-5" />}
                 title="Emergency contact"
@@ -2398,7 +3248,7 @@ const handleDownloadPDF = () => {
           {(age !== null && age < 18) &&
             (data.patient.guardianFirstName ||
               data.patient.guardianLastName) && (
-              <section className="rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm">
+              <section className={isDark ? "rounded-[30px] border border-slate-800 bg-slate-900/80 p-7 shadow-sm" : "rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm"}>
                 <SectionHeader
                   icon={<ShieldCheck className="h-5 w-5" />}
                   title="Parent / guardian"
@@ -2434,7 +3284,7 @@ const handleDownloadPDF = () => {
 
           {/* EXISTING MEDICAL RECORDS */}
 
-          <section className="rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm">
+          <section className={isDark ? "rounded-[30px] border border-slate-800 bg-slate-900/80 p-7 shadow-sm" : "rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm"}>
             <SectionHeader
               icon={<Stethoscope className="h-5 w-5" />}
               title="Doctor records"
@@ -2452,16 +3302,16 @@ const handleDownloadPDF = () => {
                 {data.medicalRecords.map((record) => (
                   <div
                     key={record.id}
-                    className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5"
+                    className={isDark ? "rounded-2xl border border-slate-800 bg-slate-950/60 p-5" : "rounded-2xl border border-slate-100 bg-slate-50/70 p-5"}
                   >
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
-                        <h3 className="font-bold text-slate-900">
+                        <h3 className={isDark ? "font-bold text-white" : "font-bold text-slate-900"}>
                           {record.title}
                         </h3>
 
                         {record.doctor && (
-                          <p className="mt-1 text-sm text-slate-500">
+                          <p className={isDark ? "mt-1 text-sm text-slate-400" : "mt-1 text-sm text-slate-500"}>
                             Dr.{" "}
                             {record.doctor.firstName}{" "}
                             {record.doctor.lastName}
@@ -2482,7 +3332,7 @@ const handleDownloadPDF = () => {
                           Symptoms
                         </p>
 
-                        <p className="mt-1 text-sm leading-6 text-slate-600">
+                        <p className={isDark ? "mt-1 text-sm leading-6 text-slate-300" : "mt-1 text-sm leading-6 text-slate-600"}>
                           {record.symptoms}
                         </p>
                       </div>
@@ -2494,7 +3344,7 @@ const handleDownloadPDF = () => {
                           Diagnosis
                         </p>
 
-                        <p className="mt-1 text-sm leading-6 text-slate-600">
+                        <p className={isDark ? "mt-1 text-sm leading-6 text-slate-300" : "mt-1 text-sm leading-6 text-slate-600"}>
                           {record.diagnosis}
                         </p>
                       </div>
@@ -2506,7 +3356,7 @@ const handleDownloadPDF = () => {
                           Notes
                         </p>
 
-                        <p className="mt-1 text-sm leading-6 text-slate-600">
+                        <p className={isDark ? "mt-1 text-sm leading-6 text-slate-300" : "mt-1 text-sm leading-6 text-slate-600"}>
                           {record.notes}
                         </p>
                       </div>
@@ -2519,7 +3369,7 @@ const handleDownloadPDF = () => {
 
           {/* PRESCRIPTIONS */}
 
-          <section className="rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm">
+          <section className={isDark ? "rounded-[30px] border border-slate-800 bg-slate-900/80 p-7 shadow-sm" : "rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm"}>
             <SectionHeader
               icon={<Pill className="h-5 w-5" />}
               title="Prescriptions"
@@ -2537,16 +3387,16 @@ const handleDownloadPDF = () => {
                   (prescription) => (
                     <div
                       key={prescription.id}
-                      className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5"
+                      className={isDark ? "rounded-2xl border border-slate-800 bg-slate-950/60 p-5" : "rounded-2xl border border-slate-100 bg-slate-50/70 p-5"}
                     >
                       <div className="flex items-start justify-between">
                         <div>
-                          <h3 className="font-bold text-slate-900">
+                          <h3 className={isDark ? "font-bold text-white" : "font-bold text-slate-900"}>
                             Prescription
                           </h3>
 
                           {prescription.doctor && (
-                            <p className="mt-1 text-sm text-slate-500">
+                            <p className={isDark ? "mt-1 text-sm text-slate-400" : "mt-1 text-sm text-slate-500"}>
                               Dr.{" "}
                               {
                                 prescription.doctor
@@ -2562,7 +3412,7 @@ const handleDownloadPDF = () => {
 
                         <span className="text-xs text-slate-400">
                           {formatDate(
-                            prescription.prescribedAt
+                            prescription.prescribedDate
                           )}
                         </span>
                       </div>
@@ -2572,15 +3422,15 @@ const handleDownloadPDF = () => {
                           (item) => (
                             <div
                               key={item.id}
-                              className="rounded-xl bg-white p-4"
+                              className={isDark ? "rounded-xl bg-slate-950/60 p-4" : "rounded-xl bg-white p-4"}
                             >
-                              <p className="font-semibold text-slate-800">
+                              <p className={isDark ? "font-semibold text-slate-100" : "font-semibold text-slate-800"}>
                                 {
                                   item.medicationName
                                 }
                               </p>
 
-                              <p className="mt-1 text-sm text-slate-500">
+                              <p className={isDark ? "mt-1 text-sm text-slate-400" : "mt-1 text-sm text-slate-500"}>
                                 {item.dosage ||
                                   "Dosage not specified"}
                                 {item.frequency &&
@@ -2601,7 +3451,7 @@ const handleDownloadPDF = () => {
 
           {/* LABORATORY */}
 
-          <section className="rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm">
+          <section className={isDark ? "rounded-[30px] border border-slate-800 bg-slate-900/80 p-7 shadow-sm" : "rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm"}>
             <SectionHeader
               icon={<FileText className="h-5 w-5" />}
               title="Laboratory results"
@@ -2614,70 +3464,47 @@ const handleDownloadPDF = () => {
                 description="Your laboratory analyses and results will appear here."
               />
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {data.laboratoryResults.map(
                   (result) => (
                     <div
                       key={result.id}
-                      className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5"
+                      className={isDark ? "rounded-2xl border border-slate-800 bg-slate-950/60 p-4" : "rounded-2xl border border-slate-100 bg-slate-50/70 p-4"}
                     >
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <h3 className="font-bold text-slate-900">
-                            {result.testName}
-                          </h3>
-
-                          <p className="mt-1 text-sm text-slate-500">
-                            {result.laboratoryName ||
-                              "Laboratory"}
-                          </p>
-                        </div>
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                        <h3 className={isDark ? "font-bold text-white" : "font-bold text-slate-900"}>
+                          {result.testName}
+                        </h3>
 
                         <span className="text-xs text-slate-400">
                           {formatDate(
-                            result.resultDate
+                            result.testDate
                           )}
                         </span>
                       </div>
 
+                      <p className={isDark ? "mt-1 text-xs text-slate-400" : "mt-1 text-xs text-slate-500"}>
+                        {result.laboratoryName ||
+                          "Laboratory"}
+                      </p>
+
                       {result.parameters.length >
                         0 && (
-                        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-white">
-                          <div className="divide-y divide-slate-100">
-                            {result.parameters.map(
-                              (parameter) => (
-                                <div
-                                  key={
-                                    parameter.id
-                                  }
-                                  className="grid grid-cols-2 gap-4 px-4 py-3 text-sm md:grid-cols-4"
-                                >
-                                  <span className="font-medium text-slate-700">
-                                    {
-                                      parameter.name
-                                    }
-                                  </span>
-
-                                  <span className="text-slate-600">
-                                    {
-                                      parameter.value
-                                    }{" "}
-                                    {parameter.unit}
-                                  </span>
-
-                                  <span className="text-slate-400">
-                                    {parameter.referenceRange ||
-                                      "—"}
-                                  </span>
-
-                                  <span className="font-semibold text-slate-600">
-                                    {parameter.flag ||
-                                      "Normal"}
-                                  </span>
-                                </div>
-                              )
-                            )}
-                          </div>
+                        <div className="mt-2.5 flex flex-wrap gap-1.5">
+                          {result.parameters.map(
+                            (parameter) => (
+                              <span
+                                key={
+                                  parameter.id
+                                }
+                                className={isDark ? "inline-flex items-center gap-1 rounded-md border border-blue-500/30 bg-blue-500/15 px-2 py-0.5 text-[11px] font-medium text-blue-300" : "inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700"}
+                              >
+                                {
+                                  parameter.name
+                                }
+                              </span>
+                            )
+                          )}
                         </div>
                       )}
                     </div>
@@ -2689,7 +3516,7 @@ const handleDownloadPDF = () => {
 
           {/* VACCINATIONS */}
 
-          <section className="rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm">
+          <section className={isDark ? "rounded-[30px] border border-slate-800 bg-slate-900/80 p-7 shadow-sm" : "rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm"}>
             <SectionHeader
               icon={<Syringe className="h-5 w-5" />}
               title="Vaccination history"
@@ -2707,21 +3534,21 @@ const handleDownloadPDF = () => {
                   (vaccination) => (
                     <div
                       key={vaccination.id}
-                      className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5"
+                      className={isDark ? "rounded-2xl border border-slate-800 bg-slate-950/60 p-5" : "rounded-2xl border border-slate-100 bg-slate-50/70 p-5"}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <h3 className="font-bold text-slate-900">
+                          <h3 className={isDark ? "font-bold text-white" : "font-bold text-slate-900"}>
                             {
                               vaccination.vaccineName
                             }
                           </h3>
 
-                          {vaccination.doseNumber && (
-                            <p className="mt-1 text-sm text-slate-500">
+                          {vaccination.dose && (
+                            <p className={isDark ? "mt-1 text-sm text-slate-400" : "mt-1 text-sm text-slate-500"}>
                               Dose{" "}
                               {
-                                vaccination.doseNumber
+                                vaccination.dose
                               }
                             </p>
                           )}
@@ -2729,13 +3556,13 @@ const handleDownloadPDF = () => {
 
                         <span className="text-xs text-slate-400">
                           {formatDate(
-                            vaccination.administeredAt
+                            vaccination.vaccinationDate
                           )}
                         </span>
                       </div>
 
                       {vaccination.notes && (
-                        <p className="mt-3 text-sm leading-6 text-slate-500">
+                        <p className={isDark ? "mt-3 text-sm leading-6 text-slate-400" : "mt-3 text-sm leading-6 text-slate-500"}>
                           {vaccination.notes}
                         </p>
                       )}
@@ -2748,7 +3575,7 @@ const handleDownloadPDF = () => {
 
           {/* APPOINTMENTS */}
 
-          <section className="rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm">
+          <section className={isDark ? "rounded-[30px] border border-slate-800 bg-slate-900/80 p-7 shadow-sm" : "rounded-[30px] border border-slate-100 bg-white p-7 shadow-sm"}>
             <SectionHeader
               icon={<Stethoscope className="h-5 w-5" />}
               title="Appointments"
@@ -2766,21 +3593,21 @@ const handleDownloadPDF = () => {
                   (appointment) => (
                     <div
                       key={appointment.id}
-                      className="flex flex-col gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-5 md:flex-row md:items-center md:justify-between"
+                      className={isDark ? "flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-5 md:flex-row md:items-center md:justify-between" : "flex flex-col gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-5 md:flex-row md:items-center md:justify-between"}
                     >
                       <div className="flex items-center gap-4">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
+                        <div className={isDark ? "flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-300" : "flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-600"}>
                           <Stethoscope className="h-5 w-5" />
                         </div>
 
                         <div>
-                          <p className="font-semibold text-slate-900">
+                          <p className={isDark ? "font-semibold text-white" : "font-semibold text-slate-900"}>
                             {appointment.doctor
                               ? `Dr. ${appointment.doctor.firstName} ${appointment.doctor.lastName}`
                               : "Doctor"}
                           </p>
 
-                          <p className="mt-1 text-sm text-slate-500">
+                          <p className={isDark ? "mt-1 text-sm text-slate-400" : "mt-1 text-sm text-slate-500"}>
                             {formatDate(
                               appointment.appointmentDate
                             )}
@@ -2789,7 +3616,7 @@ const handleDownloadPDF = () => {
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <span className="rounded-full bg-violet-50 px-3 py-1.5 text-xs font-semibold capitalize text-violet-600">
+                        <span className={isDark ? "rounded-full bg-sky-500/15 px-3 py-1.5 text-xs font-semibold capitalize text-sky-300" : "rounded-full bg-sky-50 px-3 py-1.5 text-xs font-semibold capitalize text-sky-600"}>
                           {appointment.status
                             .toLowerCase()
                             .replaceAll(
@@ -2806,6 +3633,7 @@ const handleDownloadPDF = () => {
           </section>
         </>
       )}
+      </>)}
     </div>
   );
 }
@@ -2823,9 +3651,10 @@ function InfoCard({
   value: string | null;
   icon: React.ReactNode;
 }) {
+  const { isDark } = usePatientTheme();
   return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5">
-      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white text-violet-600 shadow-sm">
+    <div className={isDark ? "rounded-2xl border border-slate-800 bg-slate-950/60 p-5" : "rounded-2xl border border-slate-100 bg-slate-50/70 p-5"}>
+      <div className={isDark ? "mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800 text-sky-300 shadow-sm" : "mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white text-sky-600 shadow-sm"}>
         {icon}
       </div>
 
@@ -2833,7 +3662,7 @@ function InfoCard({
         {label}
       </p>
 
-      <p className="mt-2 break-words text-sm font-semibold leading-6 text-slate-800">
+      <p className={isDark ? "mt-2 break-words text-sm font-semibold leading-6 text-slate-100" : "mt-2 break-words text-sm font-semibold leading-6 text-slate-800"}>
         {value || "Not provided"}
       </p>
     </div>
@@ -2847,13 +3676,14 @@ function HistoryCard({
   title: string;
   value: string | null;
 }) {
+  const { isDark } = usePatientTheme();
   return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5">
+    <div className={isDark ? "rounded-2xl border border-slate-800 bg-slate-950/60 p-5" : "rounded-2xl border border-slate-100 bg-slate-50/70 p-5"}>
       <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
         {title}
       </p>
 
-      <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-600">
+      <p className={isDark ? "mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-300" : "mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-600"}>
         {value || "No information provided."}
       </p>
     </div>
@@ -2869,17 +3699,18 @@ function EmptyState({
   title: string;
   description: string;
 }) {
+  const { isDark } = usePatientTheme();
   return (
-    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-6 py-10 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm">
+    <div className={isDark ? "rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 px-6 py-10 text-center" : "rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-6 py-10 text-center"}>
+      <div className={isDark ? "mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-800 text-slate-400 shadow-sm" : "mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm"}>
         {icon}
       </div>
 
-      <h3 className="mt-4 text-sm font-bold text-slate-800">
+      <h3 className={isDark ? "mt-4 text-sm font-bold text-slate-100" : "mt-4 text-sm font-bold text-slate-800"}>
         {title}
       </h3>
 
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+      <p className={isDark ? "mx-auto mt-2 max-w-md text-sm leading-6 text-slate-400" : "mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500"}>
         {description}
       </p>
     </div>

@@ -1029,3 +1029,263 @@ const updatedPatient = await prisma.patient.update({
     );
   }
 }
+
+/* ============================================================
+   POST - PATIENT CREATES A PERSONAL RECORD ENTRY
+   (doctorId stays null: doctor-written records are read-only)
+============================================================ */
+
+export async function POST(request: NextRequest) {
+  try {
+    const user = await getAuthenticatedUser(request);
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unauthorized.",
+        },
+        { status: 401 }
+      );
+    }
+
+    const profile = await prisma.profile.findUnique({
+      where: {
+        authUserId: user.id,
+      },
+      select: {
+        id: true,
+        userType: true,
+      },
+    });
+
+    if (!profile || profile.userType !== "PATIENT") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "This account is not a patient account.",
+        },
+        { status: 403 }
+      );
+    }
+
+    const patient = await prisma.patient.findUnique({
+      where: {
+        profileId: profile.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!patient) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Patient record not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    const body = await request.json();
+
+    const normalize = (value: unknown): string | null => {
+      if (typeof value !== "string") {
+        return null;
+      }
+
+      const trimmed = value.trim();
+
+      return trimmed.length > 0 ? trimmed : null;
+    };
+
+    const title = normalize(body.title);
+    const recordDateRaw = normalize(body.recordDate);
+
+    if (!title) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "A title is required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const recordDate = recordDateRaw ? new Date(recordDateRaw) : new Date();
+
+    if (Number.isNaN(recordDate.getTime())) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid record date.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const record = await prisma.medicalRecord.create({
+      data: {
+        patientId: patient.id,
+        doctorId: null,
+        title,
+        diagnosis: normalize(body.diagnosis),
+        symptoms: normalize(body.symptoms),
+        notes: normalize(body.notes),
+        recordDate,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        record,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error(
+      "PATIENT MEDICAL RECORD POST ERROR:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "An error occurred while creating the record entry.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/* ============================================================
+   DELETE - PATIENT REMOVES A PERSONAL ENTRY (?id=...)
+   Doctor-written records (doctorId != null) are read-only.
+============================================================ */
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await getAuthenticatedUser(request);
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unauthorized.",
+        },
+        { status: 401 }
+      );
+    }
+
+    const profile = await prisma.profile.findUnique({
+      where: {
+        authUserId: user.id,
+      },
+      select: {
+        id: true,
+        userType: true,
+      },
+    });
+
+    if (!profile || profile.userType !== "PATIENT") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "This account is not a patient account.",
+        },
+        { status: 403 }
+      );
+    }
+
+    const patient = await prisma.patient.findUnique({
+      where: {
+        profileId: profile.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!patient) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Patient record not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Record id is required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const existing = await prisma.medicalRecord.findFirst({
+      where: {
+        id,
+        patientId: patient.id,
+      },
+      select: {
+        id: true,
+        doctorId: true,
+      },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Record not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    if (existing.doctorId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Doctor-written records cannot be deleted.",
+        },
+        { status: 403 }
+      );
+    }
+
+    await prisma.medicalRecord.delete({
+      where: {
+        id,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+    });
+  } catch (error) {
+    console.error(
+      "PATIENT MEDICAL RECORD DELETE ERROR:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "An error occurred while deleting the record entry.",
+      },
+      { status: 500 }
+    );
+  }
+}

@@ -48,7 +48,7 @@ type ResultResponse = {
 type AIResponse = QuestionResponse | ResultResponse;
 
 const SYSTEM_INSTRUCTION = `
-Tu es MediConnect AI, un assistant d'orientation médicale préliminaire.
+Tu es DOCTORZ Co., un assistant d'orientation médicale préliminaire.
 
 OBJECTIF :
 Aider le patient à décrire son problème et l'orienter vers une ou plusieurs

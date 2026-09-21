@@ -89,7 +89,7 @@ export default function Features() {
             </span>
           </h2>
           <p className="mt-6 text-lg text-slate-600">
-            MediConnect AI centralizes appointments, medical records,
+            DOCTORZ Co. centralizes appointments, medical records,
             prescriptions, laboratory services and AI assistance in one secure
             platform.
           </p>

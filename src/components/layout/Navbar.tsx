@@ -61,7 +61,7 @@ export default function Navbar() {
               <Sparkles size={22} className="text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-900">MediConnect</h1>
+              <h1 className="text-xl font-bold text-slate-900">DOCTORZ Co.</h1>
               <p className="text-xs font-medium text-slate-400">AI Healthcare</p>
             </div>
           </Link>
@@ -136,7 +136,7 @@ export default function Navbar() {
                     <Sparkles size={20} className="text-white" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-slate-900">MediConnect</h2>
+                    <h2 className="text-lg font-bold text-slate-900">DOCTORZ Co.</h2>
                     <p className="text-xs text-slate-400">AI Healthcare</p>
                   </div>
                 </div>

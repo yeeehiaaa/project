@@ -99,7 +99,22 @@ export default function DoctorPrescriptionsView({
     else setIsLoading(true);
 
     try {
-      const res = await fetch("/api/prescriptions", { cache: "no-store" });
+      // Per-doctor isolation: authenticated doctor sees ONLY his own prescriptions.
+      const { supabase } = await import("@/lib/supabase");
+      const { data: sessionData } = await supabase.auth.getSession().catch(() => ({
+        data: { session: null },
+      }));
+      const token = (sessionData as any)?.session?.access_token;
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      // doctorId query as fallback scope when token is unavailable
+      const doctorQuery = (doctorInfo as any)?.id
+        ? `?doctorId=${encodeURIComponent((doctorInfo as any).id)}`
+        : "";
+      const res = await fetch(`/api/prescriptions${doctorQuery}`, {
+        cache: "no-store",
+        headers,
+      });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {

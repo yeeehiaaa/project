@@ -319,7 +319,7 @@ export default function LoginForm() {
         </h1>
 
         <p className="mt-2 text-gray-500">
-          Sign in to your MediConnect AI account
+          Sign in to your DOCTORZ Co. account
         </p>
 
       </div>

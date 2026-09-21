@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   /* config options here */
   output: "standalone",
   reactCompiler: true,
+  // Autorise le test depuis un téléphone sur le même Wi-Fi (adresse LAN).
+  // Si ton IP locale change, remplace-la par la nouvelle (voir le terminal : Network: http://...).
+  allowedDevOrigins: ["192.168.100.10"],
   images: {
     remotePatterns: [
       {

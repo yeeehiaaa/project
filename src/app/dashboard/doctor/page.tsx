@@ -32,8 +32,11 @@ import {
   Moon,
   Download,
   Trash2,
+  Check,
+  CalendarDays,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import VideoRoom from "@/components/call/VideoRoom";
 import {
   generatePrescriptionPDF,
   PrescriptionDoctorInfo,
@@ -42,11 +45,13 @@ import {
 
 import DoctorWelcomeBanner from "@/components/doctor/DoctorWelcomeBanner";
 import DoctorCalendarView from "@/components/doctor/DoctorCalendarView";
+import DoctorLabNotifs from "@/components/doctor/DoctorLabNotifs";
 import DoctorIpadDock from "@/components/doctor/DoctorIpadDock";
 import DoctorMessengerView from "@/components/doctor/DoctorMessengerView";
 import DoctorPatientsView from "@/components/doctor/DoctorPatientsView";
 import DoctorPrescriptionsView from "@/components/doctor/DoctorPrescriptionsView";
 import DoctorProfileView from "@/components/doctor/DoctorProfileView";
+import DoctorzBrand from "@/components/brand/DoctorzBrand";
 
 export interface Appointment {
   id: string;
@@ -60,6 +65,7 @@ export interface Appointment {
 
   // Rendez-vous
   appointmentDate: string;
+  previousDate?: string | null;
   time: string;
 
   type: "IN_PERSON" | "ONLINE" | "HOME_VISIT";
@@ -67,6 +73,7 @@ export interface Appointment {
   status:
     | "PENDING"
     | "CONFIRMED"
+    | "RESCHEDULED"
     | "WAITING"
     | "IN_PROGRESS"
     | "COMPLETED"
@@ -542,7 +549,11 @@ export default function DoctorDashboard() {
   // ============================================================
   // PATIENTS STATE
   // ============================================================
+  // patients = MES patients (liés à moi : isolation par compte).
+  // allPatients = annuaire complet (sélecteurs de création : nouveau
+  // RDV / nouvelle ordonnance, y compris pour un patient jamais vu).
   const [patients, setPatients] = useState<DoctorPatient[]>(INITIAL_PATIENTS);
+  const [allPatients, setAllPatients] = useState<DoctorPatient[]>(INITIAL_PATIENTS);
 
   // ============================================================
   // APPOINTMENTS STATE
@@ -638,7 +649,7 @@ export default function DoctorDashboard() {
     if (patientName) {
       setPrescriptionPatient(patientName);
     } else {
-      setPrescriptionPatient(patients[0]?.name || "Karim Haddad");
+      setPrescriptionPatient(allPatients[0]?.name || "Karim Haddad");
     }
     setShowPrescriptionModal(true);
   };
@@ -661,7 +672,9 @@ export default function DoctorDashboard() {
         headers["Authorization"] = `Bearer ${session.access_token}`;
       }
 
-      // 2. LOAD APPOINTMENTS
+      // 2. LOAD APPOINTMENTS (per-doctor isolated via Bearer token).
+      // When authenticated, ALWAYS replace mock data — even with an empty list —
+      // so doctor 2 never sees doctor 1's demo appointments.
       const appointmentsResponse = await fetch(
         "/api/dashboard/doctor/appointments",
         {
@@ -673,12 +686,14 @@ export default function DoctorDashboard() {
 
       if (appointmentsResponse && appointmentsResponse.ok) {
         const appointmentsData = await appointmentsResponse.json();
-        if (Array.isArray(appointmentsData.appointments) && appointmentsData.appointments.length > 0) {
+        if (Array.isArray(appointmentsData.appointments)) {
           setAppointments(appointmentsData.appointments);
         }
+      } else if (!session?.access_token) {
+        // Not logged in: keep demo data for preview
       }
 
-      // 3. LOAD PATIENTS
+      // 3. LOAD PATIENTS (per-doctor isolated: only linked patients)
       const patientsResponse = await fetch("/api/dashboard/doctor/patients", {
         method: "GET",
         headers,
@@ -687,9 +702,28 @@ export default function DoctorDashboard() {
 
       if (patientsResponse && patientsResponse.ok) {
         const patientsData = await patientsResponse.json();
-        if (Array.isArray(patientsData.patients) && patientsData.patients.length > 0) {
+        if (Array.isArray(patientsData.patients)) {
           setPatients(patientsData.patients);
         }
+      } else if (patientsResponse && patientsResponse.status === 401) {
+        // Authenticated as non-doctor or new doctor with no patients yet: empty, not mock
+        if (session?.access_token) setPatients([]);
+      }
+
+      // 3b. LOAD FULL DIRECTORY (sélecteurs de création : jamais vide)
+      const directoryResponse = await fetch("/api/dashboard/doctor/patients?scope=all", {
+        method: "GET",
+        headers,
+        cache: "no-store",
+      }).catch(() => null);
+
+      if (directoryResponse && directoryResponse.ok) {
+        const directoryData = await directoryResponse.json();
+        if (Array.isArray(directoryData.patients) && directoryData.patients.length > 0) {
+          setAllPatients(directoryData.patients);
+        }
+      } else if (directoryResponse && directoryResponse.status === 401) {
+        if (session?.access_token) setAllPatients([]);
       }
 
       // 4. LOAD DOCTOR PROFILE
@@ -747,6 +781,8 @@ export default function DoctorDashboard() {
   const filteredAppointments = appointments.filter((apt) => {
     // Filter by selected calendar date if active
     if (selectedCalendarDate) {
+      // Les rendez-vous refusés ne restent pas dans l'agenda à leur date.
+      if (apt.status === "CANCELLED") return false;
       try {
         const aptDateStr =
           apt.appointmentDate.match(/^(\d{4})-(\d{2})-(\d{2})/)?.[0] ||
@@ -800,6 +836,65 @@ export default function DoctorDashboard() {
     setConsultationTemp("");
     setAiAnalysisResult(null);
     setShowConsultationModal(true);
+  };
+
+  // Négociation de créneaux : le médecin accepte, refuse ou propose
+  // un autre créneau. La décision du patient (RESCHEDULED -> CONFIRMED
+  // / CANCELLED) remonte ensuite dans cette même liste.
+  const [actingAptId, setActingAptId] = useState<string | null>(null);
+  const [negotiateFor, setNegotiateFor] = useState<string | null>(null);
+  const [negotiateDate, setNegotiateDate] = useState("");
+  const [negotiateError, setNegotiateError] = useState("");
+
+  const patchDoctorAppointment = async (
+    id: string,
+    body: { status: string; appointmentDate?: string }
+  ) => {
+    setActingAptId(id);
+    setNegotiateError("");
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        router.replace("/login");
+        return;
+      }
+      const response = await fetch("/api/dashboard/doctor/appointments", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ appointmentId: id, ...body }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || "Action impossible.");
+      }
+      const upd = result.appointment;
+      setAppointments((previous) =>
+        previous.map((appointment) =>
+          appointment.id === id
+            ? {
+                ...appointment,
+                status: upd.status,
+                appointmentDate: upd.appointmentDate
+                  ? new Date(upd.appointmentDate).toISOString()
+                  : appointment.appointmentDate,
+                previousDate: upd.previousDate
+                  ? new Date(upd.previousDate).toISOString()
+                  : appointment.previousDate || null,
+              }
+            : appointment
+        )
+      );
+      setNegotiateFor(null);
+      setNegotiateDate("");
+    } catch (err) {
+      setNegotiateError(err instanceof Error ? err.message : "Action impossible.");
+    } finally {
+      setActingAptId(null);
+    }
   };
 
   const handleFinishConsultation = async () => {
@@ -877,7 +972,7 @@ export default function DoctorDashboard() {
     setTimeout(() => {
       setIsAiAnalyzing(false);
       setAiAnalysisResult(
-        `Synthèse IA MediConnect (Gemini Clinical Guidance):\n` +
+        `Synthèse IA DOCTORZ Co. (Gemini Clinical Guidance):\n` +
           `• Profil: ${selectedAppointment.patientName}, ${selectedAppointment.patientAge} ans.\n` +
           `• Motif: "${selectedAppointment.reason}".\n` +
           `• Données cliniques: TA ${consultationBp || "130/80"}, Fréquence ${consultationHr || "75"} bpm, SpO2 ${consultationSpO2 || "98%"}.\n` +
@@ -933,7 +1028,7 @@ export default function DoctorDashboard() {
       return;
     }
 
-    const patientObj = patients.find(
+    const patientObj = allPatients.find(
       (p) =>
         p.name?.toLowerCase().trim() === prescriptionPatient.toLowerCase().trim() ||
         p.id === prescriptionPatient
@@ -995,7 +1090,7 @@ export default function DoctorDashboard() {
 
     // 2. Persist to real Database via /api/prescriptions
     try {
-      const patientObj = patients.find(
+      const patientObj = allPatients.find(
         (p) =>
           p.name?.toLowerCase().trim() === prescriptionPatient.toLowerCase().trim() ||
           p.id === prescriptionPatient
@@ -1013,12 +1108,24 @@ export default function DoctorDashboard() {
         };
       });
 
+      const prescriptionHeaders: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        const t = s.session?.access_token;
+        if (t) prescriptionHeaders["Authorization"] = `Bearer ${t}`;
+      } catch {
+        // no session: doctorId query/body still scopes the request
+      }
+
       const res = await fetch("/api/prescriptions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: prescriptionHeaders,
         body: JSON.stringify({
           patientId: patientObj?.id || prescriptionPatient,
           patientName: patientObj?.name || prescriptionPatient,
+          doctorId: doctorInfo.id,
           notes: prescriptionNotes,
           items: itemsPayload,
         }),
@@ -1077,6 +1184,9 @@ export default function DoctorDashboard() {
       setNewMedDuration("");
       setNewMedInstructions("");
       setPrescriptionNotes("");
+      // L'ordonnance lie le patient au médecin : actualiser "Mes patients".
+      // Le patient la reçoit automatiquement dans son compte (filtré par patient).
+      loadDoctorDashboard();
     }, 2800);
   };
 
@@ -1186,18 +1296,11 @@ export default function DoctorDashboard() {
           {/* Brand & Doctor ID */}
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <Link href="/" className="flex items-center gap-2.5 group shrink-0">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-700 to-violet-600 text-white shadow-md shadow-indigo-600/25 border border-white/10 group-hover:scale-105 transition">
-                <Stethoscope size={20} className="text-white" />
-              </div>
+              <span className="group-hover:scale-105 transition">
+                <DoctorzBrand isDark={isDark} size={40} />
+              </span>
               <div className="hidden sm:block">
                 <div className="flex items-center gap-2">
-                  <span
-                    className={`text-base font-bold tracking-tight ${
-                      isDark ? "text-white" : "text-slate-900"
-                    }`}
-                  >
-                    MediConnect Pro
-                  </span>
                   <span
                     className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded-md border ${
                       isDark
@@ -1311,6 +1414,9 @@ export default function DoctorDashboard() {
                 <span className="hidden xs:inline">En consultation</span>
               </button>
             </div>
+
+            {/* Lab news bell */}
+            <DoctorLabNotifs isDark={isDark} />
 
             {/* Virtual Card Link */}
             <Link
@@ -2047,6 +2153,33 @@ export default function DoctorDashboard() {
                                 Terminé
                               </span>
                             )}
+
+                            {/* Décision sur la demande : accepté / refusé */}
+                            {apt.status === "CONFIRMED" && (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                                  isDark
+                                    ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                                    : "bg-emerald-600 text-white border-emerald-600"
+                                }`}
+                              >
+                                <Check size={11} />
+                                Accepté
+                              </span>
+                            )}
+
+                            {apt.status === "CANCELLED" && (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                                  isDark
+                                    ? "bg-rose-500/15 text-rose-300 border-rose-500/30"
+                                    : "bg-rose-600 text-white border-rose-600"
+                                }`}
+                              >
+                                <X size={11} />
+                                Refusé
+                              </span>
+                            )}
                           </div>
 
                           <p
@@ -2103,6 +2236,109 @@ export default function DoctorDashboard() {
                             <Video size={14} />
                             <span>Lancer Visio</span>
                           </button>
+                        )}
+
+                        {/* Demande du patient : accepter / refuser / proposer */}
+                        {apt.status === "PENDING" && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={actingAptId === apt.id}
+                              onClick={() => patchDoctorAppointment(apt.id, { status: "CONFIRMED" })}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition cursor-pointer disabled:opacity-50"
+                            >
+                              <Check size={14} />
+                              <span>{actingAptId === apt.id ? "…" : "Accepter"}</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={actingAptId === apt.id}
+                              onClick={() => {
+                                if (confirm("Refuser cette demande de rendez-vous ?")) {
+                                  patchDoctorAppointment(apt.id, { status: "CANCELLED" });
+                                }
+                              }}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer disabled:opacity-50 ${
+                                isDark
+                                  ? "border-rose-500/30 text-rose-300 hover:bg-rose-500/10"
+                                  : "border-rose-200 text-rose-600 hover:bg-rose-50"
+                              }`}
+                            >
+                              <X size={14} />
+                              <span>Refuser</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNegotiateFor(negotiateFor === apt.id ? null : apt.id);
+                                setNegotiateDate("");
+                                setNegotiateError("");
+                              }}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                                isDark
+                                  ? "bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border-sky-500/30"
+                                  : "bg-sky-50 hover:bg-sky-100 text-sky-700 border-sky-200"
+                              }`}
+                            >
+                              <CalendarDays size={14} />
+                              <span>Proposer un créneau</span>
+                            </button>
+                          </>
+                        )}
+
+                        {/* Contre-proposition envoyée : décision du patient attendue */}
+                        {apt.status === "RESCHEDULED" && (
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border ${
+                              isDark
+                                ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
+                                : "bg-amber-50 text-amber-700 border-amber-200"
+                            }`}
+                          >
+                            <Clock size={14} />
+                            <span>En attente du patient</span>
+                          </span>
+                        )}
+                        {apt.status === "RESCHEDULED" && apt.previousDate && (
+                          <span className={`w-full text-[11px] ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                            Demandé :{" "}
+                            <span className="line-through">
+                              {new Date(apt.previousDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                            </span>{" "}
+                            → Proposé :{" "}
+                            <strong>
+                              {new Date(apt.appointmentDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                            </strong>
+                          </span>
+                        )}
+
+                        {/* Nouveau créneau proposé par le médecin */}
+                        {negotiateFor === apt.id && apt.status === "PENDING" && (
+                          <div className={`w-full rounded-xl border p-2.5 flex flex-col sm:flex-row gap-2 sm:items-center ${isDark ? "bg-slate-950 border-slate-700" : "bg-slate-50 border-slate-200"}`}>
+                            <input
+                              type="datetime-local"
+                              value={negotiateDate}
+                              min={new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16)}
+                              onChange={(e) => setNegotiateDate(e.target.value)}
+                              className={`flex-1 px-3 py-2 rounded-lg border text-xs focus:outline-none focus:border-indigo-500 ${isDark ? "bg-slate-900 border-slate-700 text-slate-200" : "bg-white border-slate-200 text-slate-700"}`}
+                            />
+                            <button
+                              type="button"
+                              disabled={!negotiateDate || actingAptId === apt.id}
+                              onClick={() =>
+                                patchDoctorAppointment(apt.id, {
+                                  status: "RESCHEDULED",
+                                  appointmentDate: new Date(negotiateDate).toISOString(),
+                                })
+                              }
+                              className="px-3.5 py-2 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition cursor-pointer disabled:opacity-50"
+                            >
+                              {actingAptId === apt.id ? "Envoi…" : "Envoyer au patient"}
+                            </button>
+                          </div>
+                        )}
+                        {negotiateError && (negotiateFor === apt.id || actingAptId === apt.id) && (
+                          <span className="w-full text-[11px] font-semibold text-rose-500">{negotiateError}</span>
                         )}
 
                         <button
@@ -2320,6 +2556,7 @@ export default function DoctorDashboard() {
           <DoctorMessengerView
             isDark={isDark}
             currentDoctorName={doctorInfo.name}
+            currentDoctorId={doctorInfo.id}
             onModalChange={setIsMessengerModalOpen}
             onLaunchVideoCall={(patientName) => {
               const apt = appointments.find((a) => a.patientName === patientName) || appointments[0];
@@ -2334,7 +2571,7 @@ export default function DoctorDashboard() {
           <DoctorPatientsView
             isDark={isDark}
             onSelectPatientForApt={(patientName) => {
-              const matched = patients.find((p) => p.name === patientName);
+              const matched = allPatients.find((p) => p.name === patientName);
               if (matched) {
                 // Pre-fill
               }
@@ -2740,11 +2977,11 @@ export default function DoctorDashboard() {
       ============================================================ */}
       <AnimatePresence>
         {showPrescriptionModal && (() => {
-          const currentPatientObj = patients.find(
+          const currentPatientObj = allPatients.find(
             (p) =>
               p.name?.toLowerCase().trim() ===
               prescriptionPatient?.toLowerCase().trim()
-          ) || patients[0];
+          ) || allPatients[0];
 
           return (
             <div
@@ -2880,7 +3117,7 @@ export default function DoctorDashboard() {
                               : "bg-white border-slate-300 text-slate-900 shadow-2xs"
                           }`}
                         >
-                          {patients.map((pat) => (
+                          {allPatients.map((pat) => (
                             <option key={pat.id} value={pat.name}>
                               {pat.name} ({pat.age ? `${pat.age} ans` : "Âge non précisé"} • {pat.gender}) {pat.city ? `— ${pat.city}` : ""}
                             </option>
@@ -3447,7 +3684,7 @@ export default function DoctorDashboard() {
                       Téléconsultation Sécurisée HD — {selectedAppointment.patientName}
                     </h3>
                     <p className="text-[11px] text-slate-400">
-                      Flux chiffré de bout en bout (WebRTC Médical) • Durée: 14:32
+                      Appel vidéo/vocal gratuit • max 30 min par appel
                     </p>
                   </div>
                 </div>
@@ -3461,29 +3698,37 @@ export default function DoctorDashboard() {
                 </button>
               </div>
 
-              {/* Video Stage Simulator */}
-              <div className="relative h-96 bg-slate-950 flex items-center justify-center overflow-hidden">
-                <div className="text-center space-y-3">
-                  <div className="h-20 w-20 rounded-2xl bg-slate-800 border border-slate-700 mx-auto flex items-center justify-center text-slate-300 text-2xl font-bold">
-                    {selectedAppointment.patientName.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-white">
-                      {selectedAppointment.patientName}
-                    </p>
-                    <p className="text-xs text-emerald-400">Caméra connectée • Audio clair</p>
-                  </div>
-                </div>
-
-                {/* Doctor PIP preview */}
-                <div className="absolute bottom-4 right-4 w-36 h-24 rounded-2xl bg-slate-800 border border-slate-700 overflow-hidden shadow-xl">
-                  <div className="relative w-full h-full flex items-center justify-center bg-gradient-to-tr from-indigo-900 to-slate-900">
-                    <span className="text-lg font-bold text-indigo-300">{doctorInitials}</span>
-                    <div className="absolute bottom-1 left-2 text-[9px] bg-black/60 px-1.5 py-0.5 rounded text-white font-medium">
-                      Vous (Médecin)
-                    </div>
-                  </div>
-                </div>
+              {/* Video Stage — appel WebRTC réel (PeerJS, 30 min max) */}
+              <div className="relative bg-slate-950 overflow-hidden" style={{ minHeight: 480 }}>
+                <VideoRoom
+                  roomId={selectedAppointment.id}
+                  role="doctor"
+                  displayName="Médecin"
+                  peerName={selectedAppointment.patientName}
+                  onEnd={async (secs, mode) => {
+                    try {
+                      const { data } = await supabase.auth.getSession();
+                      const token = data.session?.access_token;
+                      if (token) {
+                        await fetch("/api/calls/log", {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${token}`,
+                          },
+                          body: JSON.stringify({
+                            appointmentId: selectedAppointment.id,
+                            mode,
+                            durationSec: secs,
+                          }),
+                        });
+                      }
+                    } catch {
+                      // journalisation non bloquante
+                    }
+                    setShowVideoModal(false);
+                  }}
+                />
               </div>
 
               {/* Video Controls */}
@@ -3676,6 +3921,9 @@ export default function DoctorDashboard() {
                       appointmentsResult.appointments ?? []
                     );
 
+                    // Le patient rejoint "Mes patients" : recharger aussi l'annuaire lié.
+                    loadDoctorDashboard();
+
                     setShowNewAppointmentModal(false);
                   } catch (error) {
                     console.error("Erreur création rendez-vous:", error);
@@ -3709,7 +3957,7 @@ export default function DoctorDashboard() {
                   >
                     <option value="">Sélectionner un patient</option>
 
-                    {patients.map((patient) => (
+                    {allPatients.map((patient) => (
                       <option key={patient.id} value={patient.id}>
                         {patient.name}
                         {patient.age !== null ? ` — ${patient.age} ans` : ""}
@@ -3717,7 +3965,7 @@ export default function DoctorDashboard() {
                     ))}
                   </select>
 
-                  {patients.length === 0 && (
+                  {allPatients.length === 0 && (
                     <p className="mt-1 text-[11px] text-slate-500">
                       Aucun patient disponible.
                     </p>
@@ -3840,7 +4088,7 @@ export default function DoctorDashboard() {
 
                   <button
                     type="submit"
-                    disabled={patients.length === 0}
+                    disabled={allPatients.length === 0}
                     className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold shadow-md shadow-indigo-600/20 transition cursor-pointer"
                   >
                     Confirmer le Rendez-vous

@@ -292,7 +292,7 @@ export default function Topbar() {
         ===================================================== */}
         <div className="hidden flex-shrink-0 overflow-hidden whitespace-nowrap lg:block" style={{ width: 280 }}>
           <p className="text-xs font-semibold uppercase tracking-[2px] text-violet-600">
-            MediConnect AI
+            DOCTORZ Co.
           </p>
           <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">
             Health Dashboard

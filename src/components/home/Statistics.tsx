@@ -48,7 +48,7 @@ export default function Statistics() {
           </h2>
 
           <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-500">
-            MediConnect AI simplifies healthcare for patients,
+            DOCTORZ Co. simplifies healthcare for patients,
             doctors, pharmacies and laboratories.
           </p>
         </div>

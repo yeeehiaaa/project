@@ -104,8 +104,18 @@ export default function DoctorPatientsView({
     else setIsLoading(true);
 
     try {
+      // Per-doctor isolation: send session token so the API returns
+      // ONLY patients linked to the logged-in doctor.
+      const { supabase } = await import("@/lib/supabase");
+      const { data: sessionData } = await supabase.auth.getSession().catch(() => ({
+        data: { session: null },
+      }));
+      const token = (sessionData as any)?.session?.access_token;
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
       const res = await fetch("/api/dashboard/doctor/patients", {
         cache: "no-store",
+        headers,
       });
       if (res.ok) {
         const data = await res.json();

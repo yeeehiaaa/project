@@ -298,6 +298,11 @@ export async function GET(
           appointmentDate:
             appointment.appointmentDate.toISOString(),
 
+          previousDate:
+            appointment.previousDate
+              ? appointment.previousDate.toISOString()
+              : null,
+
           time:
             appointment.appointmentDate.toLocaleTimeString(
               "fr-FR",
@@ -682,6 +687,7 @@ export async function PATCH(
       appointmentId,
       status,
       notes,
+      appointmentDate,
     } = body;
 
     if (!appointmentId) {
@@ -702,6 +708,7 @@ export async function PATCH(
     const validStatuses = [
   "PENDING",
   "CONFIRMED",
+  "RESCHEDULED",
   "WAITING",
   "IN_PROGRESS",
   "COMPLETED",
@@ -746,6 +753,42 @@ export async function PATCH(
       );
     }
 
+    // Garde-fous de transition côté médecin (avant écriture).
+    if (status === "RESCHEDULED") {
+      if (existing.status !== "PENDING") {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Only a pending request can be rescheduled.",
+          },
+          { status: 400 }
+        );
+      }
+      if (!appointmentDate || isNaN(new Date(appointmentDate).getTime())) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "A new date is required to propose another slot.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+    if (
+      status === "CONFIRMED" &&
+      !["PENDING", "RESCHEDULED"].includes(existing.status)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Cannot confirm from ${existing.status}.`,
+        },
+        { status: 400 }
+      );
+    }
+
     const updated =
       await prisma.appointment.update({
         where: {
@@ -755,6 +798,15 @@ export async function PATCH(
         data: {
           ...(status
             ? { status }
+            : {}),
+
+          // Contre-proposition du médecin : nouveau créneau + statut
+          // RESCHEDULED, l'ancienne date est gardée dans previousDate.
+          ...(status === "RESCHEDULED" && appointmentDate
+            ? {
+                appointmentDate: new Date(appointmentDate),
+                previousDate: existing.appointmentDate,
+              }
             : {}),
 
           ...(typeof notes === "string"

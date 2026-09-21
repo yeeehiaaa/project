@@ -21,7 +21,7 @@ const faqs = [
       "Absolutely. All prescriptions are stored securely in your personal account and can be downloaded anytime.",
   },
   {
-    question: "Does MediConnect AI include an AI assistant?",
+    question: "Does DOCTORZ Co. include an AI assistant?",
     answer:
       "Yes. Our AI assistant helps explain symptoms, medications, laboratory results and guides you through your healthcare journey.",
   },
@@ -72,7 +72,7 @@ export default function FAQ() {
             Got Questions?
           </h2>
           <p className="mt-4 text-lg text-slate-600">
-            Everything you need to know about MediConnect AI.
+            Everything you need to know about DOCTORZ Co.
           </p>
         </motion.div>
 

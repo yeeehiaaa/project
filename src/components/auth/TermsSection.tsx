@@ -85,7 +85,7 @@ export default function TermsSection({
 
           <span className="leading-7 text-gray-700">
 
-            I authorize MediConnect AI to securely process,
+            I authorize DOCTORZ Co. to securely process,
             store and share my medical information with
             authorized healthcare professionals involved
             in my care.
@@ -126,7 +126,7 @@ export default function TermsSection({
 
             I would like to receive health tips,
             platform updates and newsletters from
-            MediConnect AI.
+            DOCTORZ Co.
 
           </span>
 

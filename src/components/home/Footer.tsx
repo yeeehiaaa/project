@@ -43,7 +43,7 @@ export default function Footer() {
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25">
                 <Sparkles size={24} />
               </div>
-              <h3 className="text-2xl font-bold text-white">MediConnect AI</h3>
+              <h3 className="text-2xl font-bold text-white">DOCTORZ Co.</h3>
             </div>
             <p className="mt-6 leading-7 text-slate-400">
               Intelligent healthcare solutions connecting patients, doctors and
@@ -165,7 +165,7 @@ export default function Footer() {
           className="mt-14 border-t border-white/10 pt-8 text-center text-sm text-slate-500"
         >
           <p>
-            © {new Date().getFullYear()} MediConnect AI. All rights reserved.
+            © {new Date().getFullYear()} DOCTORZ Co. All rights reserved.
           </p>
         </motion.div>
       </motion.div>

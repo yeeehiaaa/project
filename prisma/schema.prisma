@@ -66,6 +66,10 @@ model HealthcareFacility {
   doctors            DoctorFacility[]
   laboratoryStaff    LaboratoryFacility[]
   pharmacists        PharmacistFacility[]
+  stocks             PharmacyStock[]
+  stockRequests      StockRequest[]
+  reservations       PharmacyReservation[]
+  labProducts        LabProduct[]
 
   @@index([type])
   @@index([city])
@@ -123,6 +127,7 @@ model Doctor {
   specialties    DoctorSpecialty[]
   medicalRecords MedicalRecord[]
   prescriptions  Prescription[]
+  directConversations DirectConversation[]
 }
 
 model DoctorSpecialty {
@@ -196,6 +201,9 @@ model Patient {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Jeton public d'urgence (QR Emergency Card) : révocable, régénérable.
+  emergencyToken String? @unique
+
   conversations     AIConversation[]
   appointments      Appointment[]
   laboratoryResults LaboratoryResult[]
@@ -204,6 +212,252 @@ model Patient {
   prescriptions     Prescription[]
   refillRequests    RefillRequest[]
   vaccinations      Vaccination[]
+  directConversations DirectConversation[]
+  stockRequests     StockRequest[]
+  stockAlerts       StockAlert[]
+  reservations      PharmacyReservation[]
+}
+
+model DirectConversation {
+  id        String   @id @default(uuid())
+  patientId String
+  doctorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  patient  Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor   Doctor           @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  messages DirectMessage[]
+
+  @@unique([patientId, doctorId])
+  @@index([patientId])
+  @@index([doctorId])
+}
+
+model DirectMessage {
+  id             String   @id @default(uuid())
+  conversationId String
+  senderRole     String
+  senderId       String
+  senderName     String
+  text           String
+  read           Boolean  @default(false)
+  attachment     Json?
+  createdAt      DateTime @default(now())
+
+  conversation DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}
+
+// ============================================================
+// DISCUSSIONS ENTRE MÉDECINS (1:1 et groupes) — persistées en base.
+// groupName null => discussion directe entre 2 médecins.
+// doctorId stockés en simples String (aucune modification des tables
+// Doctor existantes, appartenance vérifiée côté API).
+// ============================================================
+
+model DoctorThread {
+  id          String   @id @default(uuid())
+  groupName   String?
+  specialty   String?
+  description String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members  DoctorThreadMember[]
+  messages DoctorThreadMessage[]
+
+  @@index([updatedAt])
+}
+
+model DoctorThreadMember {
+  threadId String
+  doctorId String
+  joinedAt DateTime @default(now())
+
+  thread DoctorThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@id([threadId, doctorId])
+  @@index([doctorId])
+}
+
+model DoctorThreadMessage {
+  id         String   @id @default(uuid())
+  threadId   String
+  senderId   String
+  senderName String
+  text       String
+  readBy     String[] @default([])
+  createdAt  DateTime @default(now())
+
+  thread DoctorThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId])
+}
+
+// ============================================================
+// PHARMACIES : stock par pharmacie, réservations patients,
+// alertes de disponibilité.
+// ============================================================
+
+model PharmacyStock {
+  id             String   @id @default(uuid())
+  facilityId     String
+  medicationName String
+  dosage         String?
+  quantity       Int      @default(0)
+  lowThreshold   Int      @default(5)
+  price          Decimal? @db.Decimal(10, 2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  facility HealthcareFacility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@unique([facilityId, medicationName, dosage])
+  @@index([facilityId])
+  @@index([medicationName])
+}
+
+model StockRequest {
+  id             String   @id @default(uuid())
+  patientId      String
+  facilityId     String
+  medicationName String
+  dosage         String?
+  quantity       Int      @default(1)
+  prescriptionId String?
+  prescriptionFileUrl String?
+  prescriptionFileName String?
+  status         String   @default("PENDING")
+  pickupCode     String?  @unique
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  patient  Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  facility HealthcareFacility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([facilityId])
+  @@index([status])
+}
+
+model StockAlert {
+  id             String   @id @default(uuid())
+  patientId      String
+  medicationName String
+  wilaya         String?
+  city           String?
+  createdAt      DateTime @default(now())
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([medicationName])
+}
+
+// ============================================================
+// RÉSERVATIONS GROUPÉES : un panier = un code de retrait,
+// revue médicament par médicament côté pharmacie.
+// Header PENDING -> READY (>=1 CONFIRMED) / REFUSED (tout refusé)
+// -> COMPLETED (achat terminé, stock décrémenté) / CANCELLED.
+// Item PENDING -> CONFIRMED / REFUSED.
+// Ordonnance optionnelle : prescriptionId (plateforme) et/ou
+// fichier image/PDF (data URL stockée en texte).
+// ============================================================
+
+model PharmacyReservation {
+  id                  String   @id @default(uuid())
+  patientId           String
+  facilityId          String
+  pickupCode          String?  @unique
+  status              String   @default("PENDING")
+  prescriptionId      String?
+  prescriptionFileUrl String?
+  prescriptionFileName String?
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  patient  Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  facility HealthcareFacility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  items    PharmacyReservationItem[]
+
+  @@index([patientId])
+  @@index([facilityId])
+  @@index([status])
+}
+
+model PharmacyReservationItem {
+  id             String   @id @default(uuid())
+  reservationId  String
+  medicationName String
+  dosage         String?
+  quantity       Int      @default(1)
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now())
+
+  reservation PharmacyReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@index([reservationId])
+}
+
+// ============================================================
+// LABORATOIRES PHARMACEUTIQUES : catalogue produits, ciblage
+// par spécialités (vide = toutes), notifications médecins,
+// compteurs de portée (vues/clics) pour la facturation.
+// ============================================================
+
+model LabProduct {
+  id           String   @id @default(uuid())
+  facilityId   String
+  name         String
+  dci          String?
+  dosage       String?
+  forme        String?
+  indications  String?
+  price        Decimal? @db.Decimal(10, 2)
+  description  String?
+  docUrl       String?
+  docName      String?
+  specialtyIds String[] @default([])
+  status       String   @default("DRAFT")
+  views        Int      @default(0)
+  clicks       Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  facility HealthcareFacility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@index([facilityId])
+  @@index([status])
+}
+
+model DoctorNotification {
+  id        String   @id @default(uuid())
+  doctorId  String
+  productId String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([doctorId])
+  @@index([productId])
+}
+
+model CallLog {
+  id            String   @id @default(uuid())
+  appointmentId String   @unique
+  doctorId      String
+  patientId     String
+  mode          String   @default("video")
+  startedAt     DateTime @default(now())
+  endedAt       DateTime?
+  durationSec   Int      @default(0)
+
+  @@index([doctorId])
+  @@index([patientId])
 }
 
 model Pharmacist {
@@ -256,6 +510,7 @@ model Appointment {
   patientId       String
   doctorId        String
   appointmentDate DateTime
+  previousDate    DateTime?
   type            AppointmentType   @default(IN_PERSON)
   status          AppointmentStatus @default(PENDING)
   reason          String?
@@ -445,6 +700,7 @@ enum AccountStatus {
 enum AppointmentStatus {
   PENDING
   CONFIRMED
+  RESCHEDULED
   WAITING
   IN_PROGRESS
   COMPLETED

@@ -106,7 +106,7 @@ export default function AISection() {
                 <Bot size={24} className="text-white" />
               </div>
               <div>
-                <h3 className="font-bold text-white">MediConnect AI</h3>
+                <h3 className="font-bold text-white">DOCTORZ Co.</h3>
                 <p className="flex items-center gap-1.5 text-sm text-green-300">
                   <span className="inline-block h-2 w-2 rounded-full bg-green-400" />
                   Online

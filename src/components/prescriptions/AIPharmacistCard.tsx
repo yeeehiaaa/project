@@ -174,7 +174,7 @@ export default function AIPharmacistCard() {
 
               <div>
                 <h3 className="font-bold">
-                  MediConnect AI Analysis
+                  DOCTORZ Co. Analysis
                 </h3>
 
                 <p className="text-sm text-slate-500">
@@ -263,7 +263,7 @@ export default function AIPharmacistCard() {
               />
 
               <p className="text-xs leading-5 text-slate-500">
-                MediConnect AI provides educational information and does not
+                DOCTORZ Co. provides educational information and does not
                 replace advice from your doctor or pharmacist. Never change
                 your medication or dosage based only on AI recommendations.
               </p>

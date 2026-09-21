@@ -1,5 +1,37 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
+
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) return null;
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+async function resolveDoctorId(request: NextRequest): Promise<string | null> {
+  try {
+    const authorization = request.headers.get("authorization");
+    if (!authorization?.startsWith("Bearer ")) return null;
+    const token = authorization.substring(7).trim();
+    if (!token) return null;
+    const supabase = getSupabaseClient();
+    if (!supabase) return null;
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData?.user) return null;
+    const doctor = await prisma.doctor.findFirst({
+      where: {
+        profile: { authUserId: userData.user.id, userType: "DOCTOR" },
+      },
+      select: { id: true },
+    });
+    return doctor?.id || null;
+  } catch {
+    return null;
+  }
+}
 
 // Helper to parse DB allergies (string, comma-separated, JSON array, or null) into string[]
 function parseAllergies(allergies: any): string[] {
@@ -111,16 +143,47 @@ function mapDbPatientToRecord(pat: any) {
   };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Isolate per doctor: only patients linked to the authenticated doctor
+    // (via appointment or prescription). Without this, doctor 1 sees doctor 2's patients.
+    const doctorId = await resolveDoctorId(request);
+    if (!doctorId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Not authenticated as doctor.",
+          patients: [],
+        },
+        { status: 401 }
+      );
+    }
+
+    // ?scope=all : annuaire complet pour les sélecteurs de création
+    // (nouveau RDV / nouvelle ordonnance). Un médecin sans activité a une
+    // liste "mes patients" vide mais doit quand même pouvoir choisir un
+    // patient pour créer le premier rendez-vous. Réservé aux médecins.
+    const { searchParams } = new URL(request.url);
+    const scopeAll = searchParams.get("scope") === "all";
+
     const dbPatients = await prisma.patient.findMany({
+      where: scopeAll
+        ? undefined
+        : {
+            OR: [
+              { appointments: { some: { doctorId } } },
+              { prescriptions: { some: { doctorId } } },
+            ],
+          },
       include: {
         profile: true,
         appointments: {
+          where: { doctorId },
           orderBy: { appointmentDate: "desc" },
           take: 5,
         },
         prescriptions: {
+          where: { doctorId },
           include: {
             items: true,
             doctor: {

@@ -156,14 +156,14 @@ export async function GET(request: NextRequest) {
 
     if (!profile) {
       console.error(
-        "MediConnect profile not found for Supabase user:",
+        "DOCTORZ Co. profile not found for Supabase user:",
         user.id
       );
 
       return NextResponse.json(
         {
           error:
-            "Your Supabase account exists, but your MediConnect profile was not found.",
+            "Your Supabase account exists, but your DOCTORZ Co. profile was not found.",
         },
         {
           status: 404,

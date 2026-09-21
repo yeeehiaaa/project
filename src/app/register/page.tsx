@@ -578,7 +578,7 @@ return (
 
             <div>
               <h1 className="text-2xl font-bold xl:text-3xl">
-                MediConnect
+                DOCTORZ Co.
               </h1>
 
               <p className="text-sm text-violet-200">
@@ -665,7 +665,7 @@ return (
 
               <div>
                 <h1 className="text-xl font-bold text-slate-900">
-                  MediConnect
+                  DOCTORZ Co.
                 </h1>
 
                 <p className="text-xs text-slate-400">
@@ -1251,7 +1251,7 @@ return (
 
       <p className="text-xs leading-5 text-violet-800">
         Your professional information will be used to create and verify
-        your MediConnect AI healthcare professional profile.
+        your DOCTORZ Co. healthcare professional profile.
       </p>
     </div>
   </motion.section>

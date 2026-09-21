@@ -1,9 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { join } from "path";
 import { prisma } from "@/lib/prisma";
 import { Conversation, DoctorContact, PatientContact, Message } from "@/types/messenger";
 
-// In-memory conversation store on the server to keep state live across requests
-let liveConversationsCache: Conversation[] | null = null;
+// Per-doctor isolated conversation store: each doctor only sees his own inbox.
+// Previously a single global array was shared by ALL doctors, so doctor 2
+// saw everything created by doctor 1.
+const liveInboxes = new Map<string, Conversation[]>();
+let legacySeeded = false;
+
+// Disk persistence so deliveries survive a dev-server restart
+// (in-memory state alone is wiped on every restart).
+const INBOX_FILE = join(process.cwd(), ".data", "doctor-inboxes.json");
+
+function persistInboxes(): void {
+  try {
+    mkdirSync(join(process.cwd(), ".data"), { recursive: true });
+    writeFileSync(INBOX_FILE, JSON.stringify(Object.fromEntries(liveInboxes)), "utf-8");
+  } catch (err) {
+    console.warn("persistInboxes error:", err);
+  }
+}
+
+function restoreInboxes(): void {
+  try {
+    if (liveInboxes.size > 0) return;
+    if (!existsSync(INBOX_FILE)) return;
+    const obj = JSON.parse(readFileSync(INBOX_FILE, "utf-8"));
+    for (const [key, value] of Object.entries(obj)) {
+      if (Array.isArray(value)) liveInboxes.set(key, value as Conversation[]);
+    }
+    // Restored real inboxes: never reseed demo data on top of them.
+    if (liveInboxes.size > 0) legacySeeded = true;
+  } catch (err) {
+    console.warn("restoreInboxes error:", err);
+  }
+}
 
 // Helper to map DB doctor to DoctorContact
 function mapDbDoctorToContact(doc: any): DoctorContact {
@@ -402,10 +435,14 @@ function generateDatabaseConversations(
 }
 
 // =========================================================================
-// GET: Fetch real doctors, patients and conversations directly from PRISMA
+// GET: per-doctor isolated inbox + full directory for discovery
 // =========================================================================
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    restoreInboxes();
+    const { searchParams } = new URL(req.url);
+    void searchParams;
+
     // 1. Fetch real doctors from Prisma database
     const dbDoctors = await prisma.doctor.findMany({
       include: {
@@ -429,23 +466,11 @@ export async function GET() {
     const doctors: DoctorContact[] = dbDoctors.map(mapDbDoctorToContact);
     const patients: PatientContact[] = dbPatients.map(mapDbPatientToContact);
 
-    // 4. Initialize or return live conversations
-    if (!liveConversationsCache || liveConversationsCache.length === 0) {
-      liveConversationsCache = generateDatabaseConversations(doctors, patients);
-    } else {
-      // Sync contacts in existing conversations
-      liveConversationsCache = liveConversationsCache.map((c) => {
-        if (c.type === "colleague" && c.doctor) {
-          const freshDoc = doctors.find((d) => d.id === c.doctor?.id);
-          if (freshDoc) return { ...c, doctor: freshDoc, title: freshDoc.name };
-        }
-        if (c.type === "patient" && c.patient) {
-          const freshPat = patients.find((p) => p.id === c.patient?.id);
-          if (freshPat) return { ...c, patient: freshPat, title: freshPat.name };
-        }
-        return c;
-      });
-    }
+    // 4. AUCUNE conversation démo : uniquement des conversations réelles.
+    // Les discussions confrères/groupes vivent dans /api/doctor-threads,
+    // les discussions patient dans /api/direct-messages.
+    // Cette route ne sert plus que d'annuaire (médecins + patients).
+    const inbox: Conversation[] = [];
 
     return NextResponse.json({
       success: true,
@@ -454,11 +479,11 @@ export async function GET() {
       counts: {
         doctors: doctors.length,
         patients: patients.length,
-        conversations: liveConversationsCache.length,
+        conversations: inbox.length,
       },
       doctors,
       patients,
-      conversations: liveConversationsCache,
+      conversations: inbox,
     });
   } catch (error) {
     console.error("GET /api/messages database error:", error);
@@ -477,6 +502,7 @@ export async function GET() {
 // =========================================================================
 export async function POST(req: NextRequest) {
   try {
+    restoreInboxes();
     const body = await req.json();
     const { action, payload } = body;
 
@@ -500,28 +526,47 @@ export async function POST(req: NextRequest) {
     const doctors: DoctorContact[] = dbDoctors.map(mapDbDoctorToContact);
     const patients: PatientContact[] = dbPatients.map(mapDbPatientToContact);
 
-    if (!liveConversationsCache) {
-      liveConversationsCache = generateDatabaseConversations(doctors, patients);
+    function getInbox(doctorId: string): Conversation[] {
+      if (!liveInboxes.has(doctorId)) liveInboxes.set(doctorId, []);
+      return liveInboxes.get(doctorId)!;
     }
 
-    // ACTION: SEND MESSAGE
+    // ACTION: SEND MESSAGE (delivered to sender + recipient inboxes)
     if (action === "send_message") {
       const {
         conversationId,
+        clientMessageId,
         text,
-        senderId = "doc-sarah",
-        senderName = "Dr. Sarah Khelifi",
+        senderId = "unknown-doctor",
+        senderName = "Dr. Praticien",
         senderRole = "doctor",
-        senderSpecialty = "Cardiologie & Maladies Vasculaires",
+        senderSpecialty = "Médecine Générale",
         attachment,
+        fromDoctorId,
+        recipientDoctorId,
+        groupMemberIds = [],
+        conversationType = "colleague",
+        convTitle,
+        convSubtitle,
+        peerDoctor,
+        groupInfo,
+        patientInfo,
       } = payload;
+
+      const senderDoctorId: string = fromDoctorId || senderId;
 
       const now = new Date();
       const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
+      // Reuse the client's message id so sender + recipient + polling all
+      // reference ONE message (otherwise the sender sees it twice on merge).
+      const messageId =
+        clientMessageId ||
+        `msg-db-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
       const newMessage: Message = {
-        id: `msg-db-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        senderId,
+        id: messageId,
+        senderId: senderDoctorId,
         senderName,
         senderRole,
         senderSpecialty,
@@ -532,13 +577,80 @@ export async function POST(req: NextRequest) {
         attachment,
       };
 
-      // Update in cache
-      const convIndex = liveConversationsCache.findIndex((c) => c.id === conversationId);
-      if (convIndex !== -1) {
-        liveConversationsCache[convIndex].messages.push(newMessage);
-        liveConversationsCache[convIndex].lastMessage = text;
-        liveConversationsCache[convIndex].time = timeStr;
+      // Update sender inbox (create shell if this conversation was born locally
+      // and the server has never seen it — otherwise delivery is impossible)
+      const senderInbox = getInbox(senderDoctorId);
+      let convIndex = senderInbox.findIndex((c) => c.id === conversationId);
+      if (convIndex === -1 && conversationId) {
+        const shell: Conversation = {
+          id: conversationId,
+          type: (conversationType as Conversation["type"]) || "colleague",
+          title: convTitle || "Discussion",
+          subtitle: convSubtitle || "",
+          lastMessage: text,
+          time: timeStr,
+          unread: false,
+          unreadCount: 0,
+          status: "normal",
+          online: true,
+          ...(peerDoctor ? { doctor: peerDoctor } : {}),
+          ...(groupInfo ? { group: groupInfo } : {}),
+          ...(patientInfo ? { patient: patientInfo } : {}),
+          messages: [],
+        };
+        senderInbox.unshift(shell);
+        convIndex = 0;
       }
+      if (convIndex !== -1) {
+        const conv = senderInbox[convIndex];
+        if (!conv.messages.some((m) => m.id === newMessage.id)) {
+          conv.messages.push(newMessage);
+          conv.lastMessage = text;
+          conv.time = timeStr;
+        }
+      }
+
+      // Deliver to 1:1 recipient inbox (doctor 1 -> doctor 2)
+      const targets = new Set<string>();
+      if (recipientDoctorId && recipientDoctorId !== senderDoctorId) {
+        targets.add(recipientDoctorId);
+      }
+      if (Array.isArray(groupMemberIds)) {
+        for (const mid of groupMemberIds) {
+          if (mid && mid !== senderDoctorId) targets.add(mid);
+        }
+      }
+      for (const targetId of targets) {
+        const inbox = getInbox(targetId);
+        const idx = inbox.findIndex((c) => c.id === conversationId);
+        const delivered = { ...newMessage, status: "delivered" as const };
+        if (idx !== -1) {
+          if (!inbox[idx].messages.some((m) => m.id === newMessage.id)) {
+            inbox[idx].messages.push(delivered);
+            inbox[idx].lastMessage = text;
+            inbox[idx].time = timeStr;
+            inbox[idx].unread = true;
+            inbox[idx].unreadCount = (inbox[idx].unreadCount || 0) + 1;
+          }
+        } else if (convIndex !== -1) {
+          // Recipient has no copy yet: clone conversation shell with this message.
+          // For 1:1 chats the title must show the SENDER (not the recipient's own name).
+          const src = senderInbox[convIndex];
+          const isColleague = src.type === "colleague";
+          inbox.unshift({
+            ...src,
+            title: isColleague ? senderName : src.title,
+            subtitle: isColleague ? senderSpecialty || src.subtitle : src.subtitle,
+            messages: [...src.messages.slice(0, -1), delivered],
+            lastMessage: text,
+            time: timeStr,
+            unread: true,
+            unreadCount: 1,
+          });
+        }
+      }
+
+      persistInboxes();
 
       return NextResponse.json({
         success: true,
@@ -547,9 +659,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ACTION: CREATE GROUP WITH DB DOCTORS
+    // ACTION: CREATE GROUP WITH DB DOCTORS (added to every member inbox)
     if (action === "create_group") {
-      const { name, description, specialty, memberIds = [], createdBy = "Dr. Sarah Khelifi" } = payload;
+      const { name, description, specialty, memberIds = [], createdBy = "Dr. Praticien", fromDoctorId } = payload;
 
       const groupDoctors = doctors.filter((d) => memberIds.includes(d.id));
 
@@ -580,7 +692,7 @@ export async function POST(req: NextRequest) {
           {
             id: `sys-db-${Date.now()}`,
             senderId: "system",
-            senderName: "Base de Données MediConnect",
+            senderName: "Base de Données DOCTORZ Co.",
             senderRole: "system",
             text: `Groupe médical certifié « ${name} » synchronisé avec succès dans la base de données. ${groupDoctors.length} praticiens rattachés. Chiffrement HDS validé.`,
             time: timeStr,
@@ -590,7 +702,23 @@ export async function POST(req: NextRequest) {
         ],
       };
 
-      liveConversationsCache.unshift(newGroupConv);
+      const recipients = new Set<string>(memberIds);
+      if (fromDoctorId) recipients.add(fromDoctorId);
+      if (recipients.size === 0) {
+        // fallback: at least creator
+        if (fromDoctorId) getInbox(fromDoctorId).unshift(newGroupConv);
+      } else {
+        for (const rid of recipients) {
+          const inbox = getInbox(rid);
+          const copy: Conversation =
+            rid === fromDoctorId
+              ? newGroupConv
+              : { ...newGroupConv, unread: true, unreadCount: 1 };
+          inbox.unshift(copy);
+        }
+      }
+
+      persistInboxes();
 
       return NextResponse.json({
         success: true,
@@ -598,12 +726,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ACTION: RESET TO DEFAULT DB STATE
+    // ACTION: RESET TO DEFAULT DB STATE (per-doctor)
     if (action === "reset") {
-      liveConversationsCache = generateDatabaseConversations(doctors, patients);
+      const { doctorId: resetDoctorId } = payload || {};
+      const fresh = generateDatabaseConversations(doctors, patients);
+      if (resetDoctorId) {
+        liveInboxes.set(resetDoctorId, fresh);
+      }
+      persistInboxes();
       return NextResponse.json({
         success: true,
-        conversations: liveConversationsCache,
+        conversations: fresh,
       });
     }
 

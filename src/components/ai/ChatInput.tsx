@@ -35,7 +35,7 @@ export default function ChatInput() {
         onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
         rows={2}
-        placeholder="Ask MediConnect AI anything about your health..."
+        placeholder="Ask DOCTORZ Co. anything about your health..."
         className="
           w-full
           resize-none

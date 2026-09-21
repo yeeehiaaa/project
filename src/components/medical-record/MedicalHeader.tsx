@@ -26,7 +26,7 @@ export default function MedicalHeader() {
 
           <div>
             <p className="text-sm font-semibold uppercase tracking-[3px] text-violet-600">
-              MediConnect AI
+              DOCTORZ Co.
             </p>
 
             <h1 className="mt-1 text-4xl font-bold text-slate-900">

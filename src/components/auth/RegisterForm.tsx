@@ -69,6 +69,14 @@ export default function RegisterForm() {
   const [guardianEmail, setGuardianEmail] = useState("");
   const [guardianPhone, setGuardianPhone] = useState("");
 
+  // Pharmacie (visible quand role === "pharmacy")
+  const [pharmacyName, setPharmacyName] = useState("");
+  const [pharmacyLicense, setPharmacyLicense] = useState("");
+  const [pharmacyPhone, setPharmacyPhone] = useState("");
+  const [pharmacyCity, setPharmacyCity] = useState("");
+  const [pharmacyWilaya, setPharmacyWilaya] = useState("");
+  const [pharmacyAddress, setPharmacyAddress] = useState("");
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -158,6 +166,10 @@ export default function RegisterForm() {
       }
     }
 
+    if (role === "pharmacy" && !pharmacyName.trim()) {
+      return "Please enter your pharmacy name.";
+    }
+
     return null;
   };
 
@@ -236,6 +248,13 @@ export default function RegisterForm() {
           address: address.trim() || null,
           city: city.trim() || null,
           wilaya: wilaya.trim() || null,
+
+          pharmacyName: pharmacyName.trim() || null,
+          pharmacyLicense: pharmacyLicense.trim() || null,
+          pharmacyPhone: pharmacyPhone.trim() || null,
+          pharmacyCity: pharmacyCity.trim() || null,
+          pharmacyWilaya: pharmacyWilaya.trim() || null,
+          pharmacyAddress: pharmacyAddress.trim() || null,
 
           guardian: isMinor
             ? {
@@ -328,7 +347,7 @@ switch (role) {
           </h1>
 
           <p className="mt-2 text-gray-500">
-            Join MediConnect AI
+            Join DOCTORZ Co.
           </p>
 
         </div>
@@ -728,6 +747,86 @@ switch (role) {
             />
 
           </div>
+
+          {/* Pharmacy */}
+
+          {role === "pharmacy" && (
+            <div className="rounded-2xl border border-violet-200 bg-violet-50 p-5">
+
+              <h2 className="mb-4 text-lg font-bold text-gray-900">
+                💊 Pharmacy Information
+              </h2>
+
+              <div className="space-y-4">
+
+                <input
+                  value={pharmacyName}
+                  onChange={(e) =>
+                    setPharmacyName(e.target.value)
+                  }
+                  placeholder="Pharmacy name *"
+                  disabled={loading}
+                  className="w-full rounded-xl border bg-white px-4 py-3 outline-none focus:border-violet-500"
+                />
+
+                <input
+                  value={pharmacyLicense}
+                  onChange={(e) =>
+                    setPharmacyLicense(e.target.value)
+                  }
+                  placeholder="License / agreement number"
+                  disabled={loading}
+                  className="w-full rounded-xl border bg-white px-4 py-3 outline-none focus:border-violet-500"
+                />
+
+                <input
+                  value={pharmacyAddress}
+                  onChange={(e) =>
+                    setPharmacyAddress(e.target.value)
+                  }
+                  placeholder="Pharmacy address"
+                  disabled={loading}
+                  className="w-full rounded-xl border bg-white px-4 py-3 outline-none focus:border-violet-500"
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+
+                  <input
+                    value={pharmacyCity}
+                    onChange={(e) =>
+                      setPharmacyCity(e.target.value)
+                    }
+                    placeholder="City"
+                    disabled={loading}
+                    className="rounded-xl border bg-white px-4 py-3 outline-none focus:border-violet-500"
+                  />
+
+                  <input
+                    value={pharmacyWilaya}
+                    onChange={(e) =>
+                      setPharmacyWilaya(e.target.value)
+                    }
+                    placeholder="Wilaya"
+                    disabled={loading}
+                    className="rounded-xl border bg-white px-4 py-3 outline-none focus:border-violet-500"
+                  />
+
+                </div>
+
+                <input
+                  value={pharmacyPhone}
+                  onChange={(e) =>
+                    setPharmacyPhone(e.target.value)
+                  }
+                  placeholder="Pharmacy phone"
+                  disabled={loading}
+                  className="w-full rounded-xl border bg-white px-4 py-3 outline-none focus:border-violet-500"
+                />
+
+              </div>
+
+            </div>
+          )}
 
           {/* Password */}
 

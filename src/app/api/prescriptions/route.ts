@@ -1,14 +1,61 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
+
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) return null;
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+async function resolveDoctorId(request: NextRequest): Promise<string | null> {
+  try {
+    const authorization = request.headers.get("authorization");
+    if (!authorization?.startsWith("Bearer ")) return null;
+    const token = authorization.substring(7).trim();
+    if (!token) return null;
+    const supabase = getSupabaseClient();
+    if (!supabase) return null;
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData?.user) return null;
+    const doctor = await prisma.doctor.findFirst({
+      where: {
+        profile: { authUserId: userData.user.id, userType: "DOCTOR" },
+      },
+      select: { id: true },
+    });
+    return doctor?.id || null;
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const patientId = searchParams.get("patientId");
+    const queryDoctorId = searchParams.get("doctorId");
+
+    // Isolate per doctor: an authenticated doctor only sees his own prescriptions.
+    const authDoctorId = await resolveDoctorId(request);
+    const effectiveDoctorId = authDoctorId || queryDoctorId;
 
     const whereClause: any = {};
     if (patientId) {
       whereClause.patientId = patientId;
+    }
+    if (effectiveDoctorId) {
+      whereClause.doctorId = effectiveDoctorId;
+    } else if (authDoctorId === null && !queryDoctorId) {
+      // No doctor scope and authenticated check failed: do not leak all prescriptions.
+      // Require explicit doctorId or valid auth.
+      return NextResponse.json(
+        { error: "Doctor scope required (missing auth or doctorId)." },
+        { status: 401 }
+      );
     }
 
     const prescriptions = await prisma.prescription.findMany({
@@ -91,11 +138,18 @@ export async function POST(request: NextRequest) {
       targetPatientId = firstPat?.id || "pat-1";
     }
 
-    // Resolve doctor ID
+    // Resolve doctor ID: NEVER default to another doctor's account.
+    // Priority: authenticated doctor > explicit doctorId > error.
     let targetDoctorId = doctorId;
+    const authDoctorId = await resolveDoctorId(request);
+    if (authDoctorId) {
+      targetDoctorId = authDoctorId;
+    }
     if (!targetDoctorId) {
-      const firstDoc = await prisma.doctor.findFirst();
-      targetDoctorId = firstDoc?.id || "doc-1";
+      return NextResponse.json(
+        { success: false, error: "Doctor authentication required to create a prescription." },
+        { status: 401 }
+      );
     }
 
     const refNum =

@@ -155,7 +155,7 @@ TEL;TYPE=CELL,VOICE:${doctor.mobile}
 EMAIL;TYPE=WORK,INTERNET:${doctor.email}
 ADR;TYPE=WORK:;;${doctor.address};Oran;;31000;Algérie
 URL:https://mediconnect.dz/doctor/card
-NOTE:Licence ONM: ${doctor.licenseNumber} - MediConnect AI Verified
+NOTE:Licence ONM: ${doctor.licenseNumber} - DOCTORZ Co. Verified
 END:VCARD`;
 
     const blob = new Blob([vCardContent], { type: "text/vcard;charset=utf-8;" });
@@ -487,7 +487,7 @@ END:VCARD`;
                           isDark ? "text-white" : "text-slate-900"
                         }`}
                       >
-                        MediConnect Pro
+                        DOCTORZ Co. Pro
                       </span>
                       <span
                         className={`text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border ${
@@ -912,7 +912,7 @@ END:VCARD`;
           isDark ? "border-slate-800/60 text-slate-500" : "border-slate-200 text-slate-500"
         }`}
       >
-        MediConnect AI • Carte Professionnelle de Santé Numérique & Télémédecine
+        DOCTORZ Co. • Carte Professionnelle de Santé Numérique & Télémédecine
       </footer>
     </div>
   );
