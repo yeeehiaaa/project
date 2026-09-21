@@ -1,8 +1,6 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";import {
   Store,
   Search,
@@ -135,7 +133,7 @@ function requestPill(status: string): string {
   }
 }
 
-export default function PharmaciesPage() {
+function PharmaciesContent() {
   const { isDark } = usePatientTheme();
   const searchParams = useSearchParams();
   const initialQ = searchParams.get("q") || "";
@@ -1082,5 +1080,19 @@ export default function PharmaciesPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function PharmaciesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[240px] items-center justify-center">
+          <Loader2 className="animate-spin text-blue-500" size={28} />
+        </div>
+      }
+    >
+      <PharmaciesContent />
+    </Suspense>
   );
 }
