@@ -475,12 +475,15 @@ if (
     }
 
     // ============================================================
-    // 5. DON'T ENTER THE PATIENT DASHBOARD UNLESS VERIFIED
+    // 5. ENTER THE DASHBOARD
+    // The dashboard re-verifies auth by itself and bounces to
+    // /login if anything is missing, so a slow profile read here
+    // must NOT block a freshly created account.
     // ============================================================
 
     if (!profileVerified) {
-      throw new Error(
-    `Your account was created, but your ${formData.role} profile is not ready yet. Please sign in again.`
+      console.warn(
+        "Profile not yet visible after signup, entering dashboard anyway."
       );
     }
 
