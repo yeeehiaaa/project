@@ -33,9 +33,11 @@ export async function GET(request: NextRequest) {
     const mine = searchParams.get("mine") === "1";
     const saved = searchParams.get("saved") === "1";
     const postId = searchParams.get("postId") || "";
+    const sort = searchParams.get("sort") === "top" ? "top" : "recent";
 
     let posts: any[] = [];
     let likes: any[] = [];
+    let dislikes: any[] = [];
     let comments: any[] = [];
     let votes: any[] = [];
     let rsvps: any[] = [];
@@ -43,6 +45,7 @@ export async function GET(request: NextRequest) {
     try {
       posts = (await (prisma as any).doctorPost.findMany({})) || [];
       likes = (await (prisma as any).postLike.findMany({})) || [];
+      dislikes = (await (prisma as any).postDislike.findMany({})) || [];
       comments = (await (prisma as any).postComment.findMany({})) || [];
       votes = (await (prisma as any).pollVote.findMany({})) || [];
       rsvps = (await (prisma as any).eventRsvp.findMany({})) || [];
@@ -78,6 +81,7 @@ export async function GET(request: NextRequest) {
     const enriched = list
       .map((p: any) => {
         const pLikes = likes.filter((l: any) => l.postId === p.id);
+        const pDislikes = dislikes.filter((l: any) => l.postId === p.id);
         const pComments = comments.filter((c: any) => c.postId === p.id);
         const pVotes = votes.filter((v: any) => v.postId === p.id);
         const pRsvps = rsvps.filter((r: any) => r.postId === p.id);
@@ -104,20 +108,77 @@ export async function GET(request: NextRequest) {
           myRsvp: pRsvps.some((r: any) => r.doctorId === doc.doctorId),
           likeCount: pLikes.length,
           liked: pLikes.some((l: any) => l.doctorId === doc.doctorId),
+          dislikeCount: pDislikes.length,
+          disliked: pDislikes.some((l: any) => l.doctorId === doc.doctorId),
           commentCount: pComments.length,
+          views: Number(p.views) || 0,
+          outcome: p.outcome || null,
+          outcomeAt: p.outcomeAt || null,
           saved: savedIds.has(p.id),
           mine: p.doctorId === doc.doctorId,
           author: authors.get(p.doctorId) || { name: "Médecin", specialtyNames: [] },
           createdAt: p.createdAt,
         };
-      })
-      .sort(
+      });
+
+    if (sort === "top") {
+      const week = Date.now() - 7 * 86400000;
+      enriched.sort((a: any, b: any) => {
+        const sa =
+          (a.likeCount - a.dislikeCount) * 2 +
+          a.commentCount * 3 +
+          (new Date(a.createdAt).getTime() >= week ? 5 : 0);
+        const sb =
+          (b.likeCount - b.dislikeCount) * 2 +
+          b.commentCount * 3 +
+          (new Date(b.createdAt).getTime() >= week ? 5 : 0);
+        return sb - sa;
+      });
+    } else {
+      enriched.sort(
         (a: any, b: any) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )
-      .slice(0, 100);
+      );
+    }
 
-    return NextResponse.json({ success: true, posts: enriched });
+    const sliced = enriched.slice(0, 100);
+
+    // Rappels J-1 : mes événements RSVP de demain → notification (sans doublon).
+    try {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const sameDay = (d: Date) =>
+        d.getFullYear() === tomorrow.getFullYear() &&
+        d.getMonth() === tomorrow.getMonth() &&
+        d.getDate() === tomorrow.getDate();
+      const myRsvpPosts = enriched.filter(
+        (p: any) =>
+          p.kind === "EVENT" &&
+          p.myRsvp &&
+          p.eventDate &&
+          sameDay(new Date(p.eventDate))
+      );
+      if (myRsvpPosts.length > 0) {
+        const existing = (await (prisma as any).doctorNotification.findMany({})) || [];
+        for (const p of myRsvpPosts) {
+          const dup = existing.some(
+            (n: any) => n.doctorId === doc.doctorId && n.postId === p.id && !n.read
+          );
+          if (dup) continue;
+          try {
+            await (prisma as any).doctorNotification.create({
+              data: { doctorId: doc.doctorId, productId: null, postId: p.id, read: false },
+            });
+          } catch {
+            // ignore
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    return NextResponse.json({ success: true, posts: sliced });
   } catch (error) {
     console.error("GET /api/community/posts error:", error);
     return NextResponse.json(
@@ -234,6 +295,73 @@ export async function POST(request: NextRequest) {
     console.error("POST /api/community/posts error:", error);
     return NextResponse.json(
       { success: false, error: "Unable to publish." },
+      { status: 500 }
+    );
+  }
+}
+
+// ============================================================
+// PATCH — modifier MON post {id, text?, title?, outcome?}
+// (outcome = conclusion du cas, horodatée)
+// ============================================================
+export async function PATCH(request: NextRequest) {
+  try {
+    const auth = await resolveAuth(request);
+    if (!auth || auth.userType !== "DOCTOR") {
+      return NextResponse.json(
+        { success: false, error: "Not authenticated as doctor." },
+        { status: 401 }
+      );
+    }
+    const doc = await resolveDoctorWithSpecialties(request);
+    if (!doc) {
+      return NextResponse.json(
+        { success: false, error: "Doctor profile not found." },
+        { status: 404 }
+      );
+    }
+    const body = await request.json().catch(() => ({}));
+    const { id } = body;
+    if (!id) {
+      return NextResponse.json({ success: false, error: "id is required." }, { status: 400 });
+    }
+    let post: any = null;
+    try {
+      const all = (await (prisma as any).doctorPost.findMany({})) || [];
+      post = all.find((p: any) => p.id === id) || null;
+    } catch {
+      post = null;
+    }
+    if (!post || post.doctorId !== doc.doctorId) {
+      return NextResponse.json({ success: false, error: "Post not found." }, { status: 404 });
+    }
+    const data: any = {};
+    if (typeof body.text === "string" && body.text.trim()) {
+      data.text = body.text.trim().slice(0, 5000);
+    }
+    if (typeof body.title === "string") {
+      data.title = body.title.trim().slice(0, 160) || null;
+    }
+    if (typeof body.outcome === "string") {
+      const o = body.outcome.trim().slice(0, 2000);
+      data.outcome = o || null;
+      data.outcomeAt = o ? new Date() : null;
+    }
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ success: false, error: "Nothing to update." }, { status: 400 });
+    }
+    let updated: any = { ...post, ...data };
+    try {
+      updated =
+        (await (prisma as any).doctorPost.update({ where: { id }, data })) || updated;
+    } catch (err) {
+      console.warn("post update failed:", err);
+    }
+    return NextResponse.json({ success: true, post: updated });
+  } catch (error) {
+    console.error("PATCH /api/community/posts error:", error);
+    return NextResponse.json(
+      { success: false, error: "Unable to update post." },
       { status: 500 }
     );
   }

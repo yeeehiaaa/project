@@ -472,6 +472,9 @@ model DoctorPost {
   pollOptions  Json?
   eventDate    DateTime?
   eventPlace   String?
+  outcome      String?
+  outcomeAt    DateTime?
+  views        Int      @default(0)
   hidden       Boolean  @default(false)
   reportsCount Int      @default(0)
   createdAt    DateTime @default(now())
@@ -489,6 +492,7 @@ model PostComment {
   parentId           String?
   text               String
   mentionedDoctorIds String[] @default([])
+  edited             Boolean  @default(false)
   createdAt          DateTime @default(now())
 
   @@index([postId])
@@ -538,6 +542,27 @@ model EventRsvp {
   createdAt DateTime @default(now())
 
   @@id([postId, doctorId])
+  @@index([postId])
+}
+
+model PostDislike {
+  postId    String
+  doctorId  String
+  createdAt DateTime @default(now())
+
+  @@id([postId, doctorId])
+  @@index([postId])
+}
+
+model CommentVote {
+  postId    String
+  commentId String
+  doctorId  String
+  value     String
+  createdAt DateTime @default(now())
+
+  @@id([commentId, doctorId])
+  @@index([commentId])
   @@index([postId])
 }
 

@@ -30,16 +30,112 @@ export async function POST(request: NextRequest) {
     }
     const body = await request.json().catch(() => ({}));
     const { action, postId } = body;
-    if (!postId || !["like", "bookmark", "poll", "rsvp", "report"].includes(action)) {
+    if (
+      !postId ||
+      !["like", "dislike", "bookmark", "poll", "rsvp", "report", "view", "comment-vote"].includes(action)
+    ) {
       return NextResponse.json(
         { success: false, error: "Invalid action." },
         { status: 400 }
       );
     }
 
+    // Compteur de vues (audience réelle).
+    if (action === "view") {
+      try {
+        const all = (await (prisma as any).doctorPost.findMany({})) || [];
+        const post = all.find((p: any) => p.id === postId);
+        if (post) {
+          await (prisma as any).doctorPost.update({
+            where: { id: postId },
+            data: { views: (Number(post.views) || 0) + 1 },
+          });
+        }
+      } catch {
+        // ignore
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    // Vote j'aime / j'aime pas sur un commentaire (exclusifs).
+    if (action === "comment-vote") {
+      const commentId = String(body.commentId || "");
+      const value = String(body.value || "");
+      if (!commentId || !["like", "dislike", "none"].includes(value)) {
+        return NextResponse.json(
+          { success: false, error: "commentId and value (like|dislike|none) are required." },
+          { status: 400 }
+        );
+      }
+      try {
+        if (value === "none") {
+          try {
+            await (prisma as any).commentVote.delete({
+              where: { commentId_doctorId: { commentId, doctorId: doc.doctorId } },
+            });
+          } catch {
+            // pas de vote : rien à faire
+          }
+        } else {
+          const all = (await (prisma as any).commentVote.findMany({})) || [];
+          const mine = all.find(
+            (v: any) => v.commentId === commentId && v.doctorId === doc.doctorId
+          );
+          if (mine) {
+            await (prisma as any).commentVote.update({
+              where: { commentId_doctorId: { commentId, doctorId: doc.doctorId } },
+              data: { value, postId },
+            });
+          } else {
+            await (prisma as any).commentVote.create({
+              data: { postId, commentId, doctorId: doc.doctorId, value },
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("comment vote failed:", err);
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "dislike") {
+      const allLikes = (await (prisma as any).postLike.findMany({})) || [];
+      if (allLikes.some((l: any) => l.postId === postId && l.doctorId === doc.doctorId)) {
+        try {
+          await (prisma as any).postLike.delete({
+            where: { postId_doctorId: { postId, doctorId: doc.doctorId } },
+          });
+        } catch { /* ignore */ }
+      }
+      const all = (await (prisma as any).postDislike.findMany({})) || [];
+      const mine = all.find((l: any) => l.postId === postId && l.doctorId === doc.doctorId);
+      if (mine) {
+        try {
+          await (prisma as any).postDislike.delete({
+            where: { postId_doctorId: { postId, doctorId: doc.doctorId } },
+          });
+        } catch { /* ignore */ }
+        return NextResponse.json({ success: true, disliked: false });
+      }
+      try {
+        await (prisma as any).postDislike.create({
+          data: { postId, doctorId: doc.doctorId },
+        });
+      } catch { /* ignore */ }
+      return NextResponse.json({ success: true, disliked: true });
+    }
+
     if (action === "like") {
       const all = (await (prisma as any).postLike.findMany({})) || [];
       const mine = all.find((l: any) => l.postId === postId && l.doctorId === doc.doctorId);
+      // Exclusif : j'aime retire j'aime pas.
+      try {
+        await (prisma as any).postDislike.delete({
+          where: { postId_doctorId: { postId, doctorId: doc.doctorId } },
+        });
+      } catch {
+        // pas de dislike : rien à faire
+      }
       if (mine) {
         try {
           await (prisma as any).postLike.delete({
