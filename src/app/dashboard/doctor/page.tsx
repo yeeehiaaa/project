@@ -34,6 +34,7 @@ import {
   Trash2,
   Check,
   CalendarDays,
+  ArrowLeft,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import VideoRoom from "@/components/call/VideoRoom";
@@ -1301,6 +1302,7 @@ export default function DoctorDashboard() {
       {/* ============================================================
           TOP CLINICAL HEADER
       ============================================================ */}
+      {activeTab !== "community" && (
       <header
         className={`sticky top-0 z-40 px-4 sm:px-6 py-3.5 transition-colors duration-200 border-b ${
           isDark
@@ -1505,11 +1507,14 @@ export default function DoctorDashboard() {
           </div>
         </div>
       </header>
+      )}
 
       {/* ============================================================
           MAIN BODY LAYOUT: TABS & CONTENT
       ============================================================ */}
       <main className="relative z-10 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex-1 space-y-6 pb-44 sm:pb-52">
+        {activeTab !== "community" && (
+          <>
         {/* DOCTOR WELCOMING BANNER (Doctor's Real Name, Picture, Status & Quick Stats) */}
         <DoctorWelcomeBanner
           doctorInfo={doctorInfo}
@@ -1877,6 +1882,8 @@ export default function DoctorDashboard() {
             </button>
           </div>
         </div>
+          </>
+        )}
 
         {/* TAB 1: AGENDA & FILE ACTIVE */}
         {activeTab === "agenda" && (
@@ -2594,9 +2601,21 @@ export default function DoctorDashboard() {
           />
         )}
 
-        {/* TAB: COMMUNAUTÉ MÉDECINS (plein écran) */}
+        {/* TAB: COMMUNAUTÉ MÉDECINS (plein écran, seule à l'écran) */}
         {activeTab === "community" && (
           <div className="-mx-4 sm:-mx-6 lg:-mx-8">
+            <div className={`px-4 sm:px-6 lg:px-10 pt-4 flex items-center gap-3 ${isDark ? "bg-transparent" : "bg-transparent"}`}>
+              <button
+                type="button"
+                onClick={() => setActiveTab("agenda")}
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer active:scale-95 ${
+                  isDark ? "border-slate-700 text-slate-200 hover:bg-slate-800" : "border-slate-200 text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                <ArrowLeft size={14} />
+                Tableau de bord
+              </button>
+            </div>
             <DoctorCommunity
               isDark={isDark}
               highlightPostId={highlightPostId}
