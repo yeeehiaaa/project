@@ -438,12 +438,14 @@ model LabProduct {
 model DoctorNotification {
   id        String   @id @default(uuid())
   doctorId  String
-  productId String
+  productId String?
+  postId    String?
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 
   @@index([doctorId])
   @@index([productId])
+  @@index([postId])
 }
 
 // ============================================================
@@ -451,6 +453,93 @@ model DoctorNotification {
 // Un abonnement par profil. Test mode (sans banque) : activation
 // immédiate, à brancher sur SATIM réel plus tard.
 // ============================================================
+
+// ============================================================
+// COMMUNAUTÉ MÉDECINS : publications, sondages, cas cliniques,
+// commentaires imbriqués, mentions, likes, signalements.
+// Médias en Supabase Storage (privé, URLs signées), jamais en base.
+// ============================================================
+
+model DoctorPost {
+  id           String   @id @default(uuid())
+  doctorId     String
+  kind         String   @default("POST")
+  title        String?
+  text         String
+  mediaPath    String?
+  mediaType    String?
+  specialtyIds String[] @default([])
+  pollOptions  Json?
+  eventDate    DateTime?
+  eventPlace   String?
+  hidden       Boolean  @default(false)
+  reportsCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([doctorId])
+  @@index([kind])
+  @@index([createdAt])
+}
+
+model PostComment {
+  id                 String   @id @default(uuid())
+  postId             String
+  doctorId           String
+  parentId           String?
+  text               String
+  mentionedDoctorIds String[] @default([])
+  createdAt          DateTime @default(now())
+
+  @@index([postId])
+  @@index([parentId])
+}
+
+model PostLike {
+  postId    String
+  doctorId  String
+  createdAt DateTime @default(now())
+
+  @@id([postId, doctorId])
+  @@index([postId])
+}
+
+model PostBookmark {
+  postId    String
+  doctorId  String
+  createdAt DateTime @default(now())
+
+  @@id([postId, doctorId])
+  @@index([doctorId])
+}
+
+model PostReport {
+  postId    String
+  doctorId  String
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@id([postId, doctorId])
+}
+
+model PollVote {
+  postId    String
+  doctorId  String
+  optionId  String
+  createdAt DateTime @default(now())
+
+  @@id([postId, doctorId])
+  @@index([postId])
+}
+
+model EventRsvp {
+  postId    String
+  doctorId  String
+  createdAt DateTime @default(now())
+
+  @@id([postId, doctorId])
+  @@index([postId])
+}
 
 model Subscription {
   id          String   @id @default(uuid())

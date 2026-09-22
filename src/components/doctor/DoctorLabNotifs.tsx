@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, FlaskConical } from "lucide-react";
+import { Bell, FlaskConical, MessageSquare } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 interface LabNotifProduct {
@@ -13,11 +13,21 @@ interface LabNotifProduct {
   labName: string;
 }
 
+interface LabNotifPost {
+  id: string;
+  kind: string;
+  title: string | null;
+  snippet: string;
+  authorName: string;
+}
+
 interface LabNotif {
   id: string;
   read: boolean;
   createdAt: string;
-  product: LabNotifProduct;
+  product?: LabNotifProduct;
+  postId?: string;
+  post?: LabNotifPost | null;
 }
 
 // Cloche "Nouveautés laboratoires" : un clic sur un médicament
@@ -93,7 +103,16 @@ export default function DoctorLabNotifs({ isDark }: { isDark: boolean }) {
       // ignore
     }
     setOpen(false);
-    router.push(`/dashboard/doctor/products/${encodeURIComponent(n.product.id)}`);
+    // Mention communauté → onglet Communauté + surlignage du post.
+    if (n.postId) {
+      window.dispatchEvent(
+        new CustomEvent("doctor-community-open", { detail: { postId: n.postId } })
+      );
+      return;
+    }
+    if (n.product) {
+      router.push(`/dashboard/doctor/products/${encodeURIComponent(n.product.id)}`);
+    }
   };
 
   return (
@@ -141,24 +160,44 @@ export default function DoctorLabNotifs({ isDark }: { isDark: boolean }) {
                   Aucune nouveauté pour votre spécialité pour le moment.
                 </p>
               ) : (
-                notifs.map((n) => (
-                  <button
-                    key={n.id}
-                    type="button"
-                    onClick={() => openNotif(n)}
-                    className={`w-full text-left px-4 py-3 border-b transition cursor-pointer ${isDark ? "border-slate-800 hover:bg-slate-800/60" : "border-slate-100 hover:bg-slate-50"} ${!n.read ? (isDark ? "bg-violet-500/5" : "bg-violet-50/60") : ""}`}
-                  >
-                    <p className="text-xs font-bold flex items-center gap-1.5">
-                      {!n.read && <span className="h-1.5 w-1.5 rounded-full bg-violet-500 shrink-0" />}
-                      <span className="truncate">{n.product.name}</span>
-                      {n.product.dosage && <span className="font-mono font-normal text-slate-400 shrink-0">{n.product.dosage}</span>}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-slate-400 truncate">
-                      {n.product.labName}
-                      {n.product.price != null ? ` • ${Number(n.product.price)} DA` : ""}
-                    </p>
-                  </button>
-                ))
+                notifs.map((n) =>
+                  n.postId ? (
+                    <button
+                      key={n.id}
+                      type="button"
+                      onClick={() => openNotif(n)}
+                      className={`w-full text-left px-4 py-3 border-b transition cursor-pointer ${isDark ? "border-slate-800 hover:bg-slate-800/60" : "border-slate-100 hover:bg-slate-50"} ${!n.read ? (isDark ? "bg-sky-500/5" : "bg-sky-50/60") : ""}`}
+                    >
+                      <p className="text-xs font-bold flex items-center gap-1.5">
+                        {!n.read && <span className="h-1.5 w-1.5 rounded-full bg-sky-500 shrink-0" />}
+                        <MessageSquare size={11} className="text-sky-500 shrink-0" />
+                        <span className="truncate">
+                          {n.post?.authorName || "Un confrère"} vous a mentionné
+                        </span>
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-slate-400 truncate">
+                        {n.post?.title || n.post?.snippet || "Voir la discussion"}
+                      </p>
+                    </button>
+                  ) : n.product ? (
+                    <button
+                      key={n.id}
+                      type="button"
+                      onClick={() => openNotif(n)}
+                      className={`w-full text-left px-4 py-3 border-b transition cursor-pointer ${isDark ? "border-slate-800 hover:bg-slate-800/60" : "border-slate-100 hover:bg-slate-50"} ${!n.read ? (isDark ? "bg-violet-500/5" : "bg-violet-50/60") : ""}`}
+                    >
+                      <p className="text-xs font-bold flex items-center gap-1.5">
+                        {!n.read && <span className="h-1.5 w-1.5 rounded-full bg-violet-500 shrink-0" />}
+                        <span className="truncate">{n.product.name}</span>
+                        {n.product.dosage && <span className="font-mono font-normal text-slate-400 shrink-0">{n.product.dosage}</span>}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-slate-400 truncate">
+                        {n.product.labName}
+                        {n.product.price != null ? ` • ${Number(n.product.price)} DA` : ""}
+                      </p>
+                    </button>
+                  ) : null
+                )
               )}
             </div>
           </div>

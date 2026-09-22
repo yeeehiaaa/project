@@ -46,6 +46,7 @@ import {
 import DoctorWelcomeBanner from "@/components/doctor/DoctorWelcomeBanner";
 import DoctorCalendarView from "@/components/doctor/DoctorCalendarView";
 import DoctorLabNotifs from "@/components/doctor/DoctorLabNotifs";
+import DoctorCommunity from "@/components/doctor/DoctorCommunity";
 import DoctorIpadDock from "@/components/doctor/DoctorIpadDock";
 import DoctorMessengerView from "@/components/doctor/DoctorMessengerView";
 import DoctorPatientsView from "@/components/doctor/DoctorPatientsView";
@@ -113,6 +114,7 @@ export type TabType =
   | "patients"
   | "prescriptions"
   | "ai_assistant"
+  | "community"
   | "profile";
 
 type DashboardTheme = "light" | "dark";
@@ -845,6 +847,20 @@ export default function DoctorDashboard() {
   const [negotiateFor, setNegotiateFor] = useState<string | null>(null);
   const [negotiateDate, setNegotiateDate] = useState("");
   const [negotiateError, setNegotiateError] = useState("");
+
+  // Communauté : surlignage d'un post depuis la cloche (@mention).
+  const [highlightPostId, setHighlightPostId] = useState<string | null>(null);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const postId = (e as CustomEvent).detail?.postId;
+      if (postId) {
+        setActiveTab("community");
+        setHighlightPostId(String(postId));
+      }
+    };
+    window.addEventListener("doctor-community-open", handler);
+    return () => window.removeEventListener("doctor-community-open", handler);
+  }, []);
 
   const patchDoctorAppointment = async (
     id: string,
@@ -1803,6 +1819,33 @@ export default function DoctorDashboard() {
               />
               <span>Co-Pilote IA Clinique</span>
             </button>
+
+            <button
+              type="button"
+              id="tab-btn-community"
+              onClick={() => setActiveTab("community")}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                activeTab === "community"
+                  ? isDark
+                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                    : "bg-white text-slate-900 shadow-xs"
+                  : isDark
+                  ? "text-slate-400 hover:text-white"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Users
+                size={15}
+                className={
+                  activeTab === "community"
+                    ? isDark
+                      ? "text-white"
+                      : "text-violet-600"
+                    : "text-violet-500"
+                }
+              />
+              <span>Communauté</span>
+            </button>
           </div>
 
           {/* Quick Action Buttons */}
@@ -2548,6 +2591,15 @@ export default function DoctorDashboard() {
               setShowNewAppointmentModal(true);
             }}
             onOpenPrescription={handleOpenNewPrescription}
+          />
+        )}
+
+        {/* TAB: COMMUNAUTÉ MÉDECINS */}
+        {activeTab === "community" && (
+          <DoctorCommunity
+            isDark={isDark}
+            highlightPostId={highlightPostId}
+            onHighlightSeen={() => setHighlightPostId(null)}
           />
         )}
 
