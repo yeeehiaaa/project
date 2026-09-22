@@ -1302,7 +1302,7 @@ export default function DoctorDashboard() {
       {/* ============================================================
           TOP CLINICAL HEADER
       ============================================================ */}
-      {activeTab !== "community" && (
+      {String(activeTab) !== "community" && (
       <header
         className={`sticky top-0 z-40 px-4 sm:px-6 py-3.5 transition-colors duration-200 border-b ${
           isDark
@@ -1513,7 +1513,7 @@ export default function DoctorDashboard() {
           MAIN BODY LAYOUT: TABS & CONTENT
       ============================================================ */}
       <main className="relative z-10 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex-1 space-y-6 pb-44 sm:pb-52">
-        {activeTab !== "community" && (
+        {String(activeTab) !== "community" && (
           <>
         {/* DOCTOR WELCOMING BANNER (Doctor's Real Name, Picture, Status & Quick Stats) */}
         <DoctorWelcomeBanner
