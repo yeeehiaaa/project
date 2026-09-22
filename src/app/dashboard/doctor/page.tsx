@@ -2594,13 +2594,15 @@ export default function DoctorDashboard() {
           />
         )}
 
-        {/* TAB: COMMUNAUTÉ MÉDECINS */}
+        {/* TAB: COMMUNAUTÉ MÉDECINS (plein écran) */}
         {activeTab === "community" && (
-          <DoctorCommunity
-            isDark={isDark}
-            highlightPostId={highlightPostId}
-            onHighlightSeen={() => setHighlightPostId(null)}
-          />
+          <div className="-mx-4 sm:-mx-6 lg:-mx-8">
+            <DoctorCommunity
+              isDark={isDark}
+              highlightPostId={highlightPostId}
+              onHighlightSeen={() => setHighlightPostId(null)}
+            />
+          </div>
         )}
 
         {/* TAB 5: MESSENGER PATIENTS & CONFRÈRES */}

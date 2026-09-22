@@ -203,6 +203,7 @@ export default function DoctorCommunity({
   onHighlightSeen: () => void;
 }) {
   const [posts, setPosts] = useState<Post[]>([]);
+  const [allPosts, setAllPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [kind, setKind] = useState("");
   const [query, setQuery] = useState("");
@@ -277,6 +278,27 @@ export default function DoctorCommunity({
   useEffect(() => {
     load();
   }, [load]);
+
+  // Stats sidebar : un seul chargement sans filtres.
+  const loadStats = useCallback(async () => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) return;
+      const res = await fetch("/api/community/posts", {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json().catch(() => ({}));
+      if (d.success) setAllPosts(Array.isArray(d.posts) ? d.posts : []);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
   useEffect(() => {
     (async () => {
@@ -370,6 +392,7 @@ export default function DoctorCommunity({
       setCAttest(false);
       setCFile(null);
       load();
+      loadStats();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Publication impossible.");
     } finally {
@@ -483,8 +506,39 @@ export default function DoctorCommunity({
   const box = isDark ? "bg-slate-900/85 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900";
   const inputCls = `w-full px-3 py-2 rounded-xl border text-xs focus:outline-none focus:border-violet-500 ${isDark ? "bg-slate-950 border-slate-700 text-white placeholder:text-slate-500" : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400"}`;
 
+  const upcomingEvents = allPosts
+    .filter((p) => p.kind === "EVENT" && p.eventDate && new Date(p.eventDate).getTime() > Date.now() - 86400000)
+    .sort((a, b) => new Date(a.eventDate as string).getTime() - new Date(b.eventDate as string).getTime())
+    .slice(0, 4);
+  const myPostsCount = allPosts.filter((p) => p.mine).length;
+  const savedCount = allPosts.filter((p) => p.saved).length;
+  const likesReceived = allPosts.filter((p) => p.mine).reduce((n, p) => n + p.likeCount, 0);
+  const topicCounts = new Map<string, number>();
+  for (const p of allPosts) {
+    for (const t of p.targetNames || []) {
+      if (t === "Toutes spécialités") continue;
+      topicCounts.set(t, (topicCounts.get(t) || 0) + 1);
+    }
+  }
+  const topTopics = Array.from(topicCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+
   return (
-    <div className="space-y-4">
+    <div className={`min-h-[85vh] px-4 sm:px-6 lg:px-10 py-6 ${isDark ? "bg-gradient-to-b from-violet-950/30 via-slate-950 to-slate-950" : "bg-gradient-to-b from-violet-50 via-slate-50 to-slate-50"}`}>
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-5 flex items-end justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className={`text-xl sm:text-2xl font-black ${isDark ? "text-white" : "text-slate-900"}`}>
+              Communauté des médecins
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Cas cliniques, questions, sondages et événements — entre confrères.
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_290px] items-start">
+          <div className="space-y-4 min-w-0">
       {/* Barre : recherche + filtre spécialité + mes contenus */}
       <div className={`p-4 rounded-3xl border ${box}`}>
         <div className="flex flex-col md:flex-row gap-2">
@@ -893,6 +947,70 @@ export default function DoctorCommunity({
           </div>
         </div>
       )}
+          </div>
+
+          {/* Sidebar */}
+          <aside className="hidden xl:block sticky top-24 space-y-4">
+            <div className={`p-4 rounded-3xl border ${box}`}>
+              <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Mon activité</p>
+              <div className="mt-2 space-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => { setOnlyMine(true); setOnlySaved(false); }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${isDark ? "hover:bg-slate-800" : "hover:bg-slate-100"}`}
+                >
+                  <span>Mes publications</span>
+                  <span className="px-2 py-0.5 rounded-lg bg-violet-500/15 text-violet-500 font-black">{myPostsCount}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setOnlySaved(true); setOnlyMine(false); }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${isDark ? "hover:bg-slate-800" : "hover:bg-slate-100"}`}
+                >
+                  <span>Sauvegardés</span>
+                  <span className="px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-500 font-black">{savedCount}</span>
+                </button>
+                <div className="flex items-center justify-between px-3 py-2 text-xs font-bold text-slate-400">
+                  <span>Likes reçus</span>
+                  <span className="px-2 py-0.5 rounded-lg bg-rose-500/15 text-rose-500 font-black">{likesReceived}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-3xl border ${box}`}>
+              <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Événements à venir</p>
+              {upcomingEvents.length === 0 ? (
+                <p className="mt-2 text-[11px] text-slate-400 italic">Aucun événement prévu.</p>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  {upcomingEvents.map((e) => (
+                    <div key={e.id} className={`px-3 py-2 rounded-2xl border ${isDark ? "border-slate-800" : "border-slate-100"}`}>
+                      <p className="text-[11px] font-bold truncate">{e.title || "Événement"}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {e.eventDate ? new Date(e.eventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}
+                        {e.eventPlace ? ` • ${e.eventPlace}` : ""} • {e.rsvpCount} participant{e.rsvpCount > 1 ? "s" : ""}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {topTopics.length > 0 && (
+              <div className={`p-4 rounded-3xl border ${box}`}>
+                <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Sujets actifs</p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {topTopics.map(([t, n]) => (
+                    <span key={t} className="px-2 py-0.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-500 text-[10px] font-bold">
+                      {t} • {n}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </aside>
+        </div>
+      </div>
     </div>
   );
 }
