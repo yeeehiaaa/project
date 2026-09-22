@@ -29,6 +29,33 @@ import { supabase } from "@/lib/supabase";
 
 type CardTheme = "white" | "sapphire" | "emerald" | "obsidian" | "royal";
 
+// Base publique du lien d'urgence :
+// - en production (Vercel...), l'origin du navigateur (URL publique) ;
+// - en local uniquement, l'URL LAN joignable depuis un téléphone
+//   (l'IP du serveur ne doit jamais écraser une URL publique).
+async function resolveEmergencyBase(): Promise<string> {
+  const origin = window.location.origin;
+  const host = window.location.hostname;
+  const isLocal =
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "[::1]" ||
+    /^192\.168\./.test(host) ||
+    /^10\./.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+  if (!isLocal) return origin;
+  try {
+    const netRes = await fetch("/api/network-url", { cache: "no-store" });
+    if (netRes.ok) {
+      const netData = await netRes.json();
+      if (netData.success && netData.lanUrl) return netData.lanUrl;
+    }
+  } catch {
+    // repli : origin du navigateur
+  }
+  return origin;
+}
+
 export default function PatientVirtualCard() {
   const [isFlipped, setIsFlipped] = useState(false);
   const [activeTheme, setActiveTheme] = useState<CardTheme>("white");
@@ -132,22 +159,7 @@ export default function PatientVirtualCard() {
             const data = await res.json();
             if (data.success && data.token) {
               setEmergencyToken(data.token);
-              // URL joignable depuis un téléphone (LAN), pas localhost.
-              let base = window.location.origin;
-              try {
-                const netRes = await fetch("/api/network-url", {
-                  cache: "no-store",
-                });
-                if (netRes.ok) {
-                  const netData = await netRes.json();
-                  if (netData.success && netData.lanUrl) {
-                    base = netData.lanUrl;
-                  }
-                }
-              } catch {
-                // repli : origin du navigateur
-              }
-              setEmergencyUrl(`${base}/r/${data.token}`);
+              setEmergencyUrl(`${await resolveEmergencyBase()}/r/${data.token}`);
             }
           }
         }
@@ -219,21 +231,7 @@ export default function PatientVirtualCard() {
         const data = await res.json();
         if (data.success && data.token && typeof window !== "undefined") {
           setEmergencyToken(data.token);
-          let base = window.location.origin;
-          try {
-            const netRes = await fetch("/api/network-url", {
-              cache: "no-store",
-            });
-            if (netRes.ok) {
-              const netData = await netRes.json();
-              if (netData.success && netData.lanUrl) {
-                base = netData.lanUrl;
-              }
-            }
-          } catch {
-            // repli : origin du navigateur
-          }
-          setEmergencyUrl(`${base}/r/${data.token}`);
+          setEmergencyUrl(`${await resolveEmergencyBase()}/r/${data.token}`);
         }
       }
     } catch (err) {
