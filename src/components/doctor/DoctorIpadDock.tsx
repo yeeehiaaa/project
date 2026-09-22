@@ -20,6 +20,7 @@ export type DoctorTabType =
   | "patients"
   | "prescriptions"
   | "ai_assistant"
+  | "community"
   | "profile";
 
 interface DoctorIpadDockProps {
@@ -82,6 +83,11 @@ export default function DoctorIpadDock({
       id: "ai_assistant",
       label: "Co-Pilote IA",
       icon: Sparkles,
+    },
+    {
+      id: "community",
+      label: "Communauté",
+      icon: Users,
     },
     {
       id: "card",
