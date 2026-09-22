@@ -18,10 +18,12 @@ import {
   Loader2,
   Search,
   FlaskConical,
+  Crown,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import DoctorzBrand from "@/components/brand/DoctorzBrand";
 import { PButton, PIconButton } from "@/components/patient/buttons";
+import SubscribeCard from "@/components/premium/SubscribeCard";
 import { buildPrescriptionDoc } from "@/lib/prescriptionPdf";
 
 interface Facility {
@@ -92,7 +94,7 @@ export default function PharmacyDashboard() {
   const [facility, setFacility] = useState<Facility | null>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState("");
-  const [tab, setTab] = useState<"stock" | "requests" | "news">("stock");
+  const [tab, setTab] = useState<"stock" | "requests" | "news" | "premium">("stock");
 
   const [news, setNews] = useState<LabNews[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
@@ -606,6 +608,14 @@ export default function PharmacyDashboard() {
                   {news.length > 0 ? ` (${news.length})` : ""}
                 </span>
               </PButton>
+              <PButton
+                variant={tab === "premium" ? "primary" : "secondary"}
+                isDark={false}
+                onClick={() => setTab("premium")}
+              >
+                <Crown size={15} />
+                <span>Premium</span>
+              </PButton>
               <span className="flex-1" />
               <PIconButton title="Actualiser" isDark={false} disabled={refreshing} onClick={refreshData}>
                 <RefreshCw size={15} className={refreshing ? "animate-spin text-blue-500" : ""} />
@@ -1028,6 +1038,9 @@ export default function PharmacyDashboard() {
                   </div>
                 )}
               </div>
+            )}
+            {tab === "premium" && (
+              <SubscribeCard isDark={false} />
             )}
           </>
         )}

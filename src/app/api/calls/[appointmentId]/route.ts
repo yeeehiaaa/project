@@ -65,6 +65,43 @@ export async function GET(
       );
     }
 
+    // Quota freemium : 1 visio/mois en FREE, illimité en PREMIUM (patient).
+    if (role === "patient") {
+      try {
+        const subs = (await (prisma as any).subscription.findMany({})) || [];
+        const sub = subs.find((s: any) => s.profileId === auth.profileId);
+        const premium =
+          sub?.plan === "PREMIUM" &&
+          sub?.status === "ACTIVE" &&
+          (!sub?.expiresAt || new Date(sub.expiresAt).getTime() > Date.now());
+        if (!premium) {
+          const logs = (await (prisma as any).callLog.findMany({})) || [];
+          const from = new Date();
+          from.setDate(1);
+          from.setHours(0, 0, 0, 0);
+          const used = logs.filter(
+            (c: any) =>
+              c.patientId === apt.patientId &&
+              new Date(c.startedAt).getTime() >= from.getTime() &&
+              (Number(c.durationSec) || 0) > 0
+          ).length;
+          if (used >= 1) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: "PAYWALL",
+                message:
+                  "Quota gratuit épuisé (1 téléconsultation / mois). Passez Premium pour continuer.",
+              },
+              { status: 402 }
+            );
+          }
+        }
+      } catch {
+        // en cas de doute, on laisse passer (pas de blocage technique)
+      }
+    }
+
     let doctorName = "Médecin";
     let patientName = "Patient";
     try {

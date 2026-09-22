@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { resolveLabStaff } from "@/lib/lab-auth";
+import { FREE_LAB_PRODUCTS, isPremiumActive } from "@/lib/subscriptions";
 
 function cleanStr(v: unknown, max: number): string | null {
   const t = String(v ?? "").trim();
@@ -150,6 +151,26 @@ export async function POST(request: NextRequest) {
       docUrl = v;
     }
     const status = body.status === "PUBLISHED" ? "PUBLISHED" : "DRAFT";
+    try {
+      const mine = (await (prisma as any).labProduct.findMany({})) || [];
+      const count = mine.filter((p: any) => p.facilityId === ctx.facilityId).length;
+      if (count >= FREE_LAB_PRODUCTS) {
+        const subs = (await (prisma as any).subscription.findMany({})) || [];
+        const sub = subs.find((s: any) => s.profileId === ctx.profileId);
+        if (!isPremiumActive(sub)) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "PAYWALL",
+              message: `Compte gratuit : ${FREE_LAB_PRODUCTS} produits max. Passez Premium pour l'illimité.`,
+            },
+            { status: 402 }
+          );
+        }
+      }
+    } catch {
+      // en cas de doute, on laisse passer
+    }
     let created: any = null;
     try {
       created = await (prisma as any).labProduct.create({

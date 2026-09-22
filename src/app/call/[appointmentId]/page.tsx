@@ -26,6 +26,7 @@ export default function CallPage() {
   const appointmentId = String((params as any)?.appointmentId || "");
   const [gate, setGate] = useState<Gate | null>(null);
   const [error, setError] = useState("");
+  const [paywall, setPaywall] = useState("");
   const [loading, setLoading] = useState(true);
 
   const getToken = async (): Promise<string | null> => {
@@ -51,7 +52,12 @@ export default function CallPage() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.success) {
-          throw new Error(data.error || "Accès à l'appel impossible.");
+          if (data.error === "PAYWALL") {
+            setPaywall(data.message || "Quota épuisé.");
+          } else {
+            setError(data.error || "Accès à l'appel impossible.");
+          }
+          return;
         }
         setGate(data);
       } catch (err) {
@@ -86,6 +92,32 @@ export default function CallPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
         <Loader2 className="animate-spin text-indigo-400" size={32} />
+      </div>
+    );
+  }
+
+  if (paywall) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white p-6">
+        <div className="max-w-sm w-full rounded-3xl border border-amber-500/30 bg-slate-900 p-8 text-center">
+          <p className="text-3xl">👑</p>
+          <p className="mt-3 font-bold">Téléconsultation Premium</p>
+          <p className="mt-1 text-xs text-slate-400">{paywall}</p>
+          <Link
+            href="/dashboard/patient/profile"
+            className="mt-4 inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-black text-white bg-gradient-to-r from-amber-500 to-yellow-400 transition"
+          >
+            Passer Premium — 500 DA/mois
+          </Link>
+          <div>
+            <Link
+              href="/dashboard/patient/appointments"
+              className="mt-2 inline-block text-[11px] text-slate-500 underline"
+            >
+              Retour aux rendez-vous
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }

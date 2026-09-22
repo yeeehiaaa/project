@@ -38,6 +38,7 @@ interface PharmacyResult {
   wilaya: string;
   phone: string;
   emergencyService: boolean;
+  isPremium?: boolean;
   items: StockItem[];
   hasStock: boolean;
 }
@@ -627,6 +628,11 @@ function PharmaciesContent() {
                     <div className="min-w-0">
                       <h3 className={`text-sm font-bold truncate ${isDark ? "text-white" : "text-slate-900"}`}>
                         {r.name}
+                        {r.isPremium && (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-gradient-to-r from-amber-500 to-yellow-400 text-white align-middle">
+                            ★ Vérifiée
+                          </span>
+                        )}
                       </h3>
                       <p className={`mt-0.5 text-[11px] flex items-center gap-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                         <MapPin size={11} className="shrink-0" />

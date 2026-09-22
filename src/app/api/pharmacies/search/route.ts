@@ -81,6 +81,39 @@ export async function GET(request: NextRequest) {
       console.warn("pharmacies search fetch failed:", err);
     }
 
+    // Mise en avant Premium : au moins un pharmacien lié abonné.
+    let premiumFacilityIds = new Set<string>();
+    try {
+      const subs = (await (prisma as any).subscription.findMany({})) || [];
+      const now = Date.now();
+      const premiumProfiles = new Set(
+        subs
+          .filter(
+            (s: any) =>
+              s.plan === "PREMIUM" &&
+              s.status === "ACTIVE" &&
+              (!s.expiresAt || new Date(s.expiresAt).getTime() > now)
+          )
+          .map((s: any) => String(s.profileId))
+      );
+      if (premiumProfiles.size > 0) {
+        const pharmacists = (await (prisma as any).pharmacist.findMany({})) || [];
+        const links = (await (prisma as any).pharmacistFacility.findMany({})) || [];
+        const premiumPharmacists = new Set(
+          pharmacists
+            .filter((p: any) => premiumProfiles.has(String(p.profileId)))
+            .map((p: any) => p.id)
+        );
+        for (const l of links) {
+          if (premiumPharmacists.has(l.pharmacistId)) {
+            premiumFacilityIds.add(String(l.facilityId));
+          }
+        }
+      }
+    } catch {
+      premiumFacilityIds = new Set<string>();
+    }
+
     // Filtrage JS (identique en mode DB réelle et mock).
     const matchedStocks = stocks.filter((s: any) =>
       q ? norm(s.medicationName).includes(q) : true
@@ -118,6 +151,7 @@ export async function GET(request: NextRequest) {
         const hasStock = items.some((i: any) => i.status !== "OUT");
         const sameCity = city && norm(f.city) === city;
         const sameWilaya = wilaya && norm(f.wilaya) === wilaya;
+        const isPremium = premiumFacilityIds.has(String(f.id));
         return {
           id: f.id,
           name: f.name,
@@ -128,7 +162,11 @@ export async function GET(request: NextRequest) {
           emergencyService: !!f.emergencyService,
           items,
           hasStock,
-          score: (hasStock ? 0 : 100) + (sameCity ? 0 : sameWilaya ? 10 : 20),
+          isPremium,
+          score:
+            (isPremium ? -1000 : 0) +
+            (hasStock ? 0 : 100) +
+            (sameCity ? 0 : sameWilaya ? 10 : 20),
         };
       })
       .sort((a: any, b: any) => a.score - b.score || a.name.localeCompare(b.name, "fr"));

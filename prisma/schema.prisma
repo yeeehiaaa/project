@@ -446,6 +446,29 @@ model DoctorNotification {
   @@index([productId])
 }
 
+// ============================================================
+// ABONNEMENTS FREEMIUM : FREE par défaut, PREMIUM payant.
+// Un abonnement par profil. Test mode (sans banque) : activation
+// immédiate, à brancher sur SATIM réel plus tard.
+// ============================================================
+
+model Subscription {
+  id          String   @id @default(uuid())
+  profileId   String   @unique
+  userType    String
+  plan        String   @default("FREE")
+  status      String   @default("ACTIVE")
+  cycle       String?
+  provider    String?
+  providerRef String?
+  startedAt   DateTime @default(now())
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+}
+
 model CallLog {
   id            String   @id @default(uuid())
   appointmentId String   @unique

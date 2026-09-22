@@ -35,6 +35,7 @@ type Doctor = {
   rating: number;
   available: boolean;
   avatar: string;
+  isPremium?: boolean;
 };
 
 type AppointmentType = "IN_PERSON" | "ONLINE" | "HOME_VISIT";
@@ -345,7 +346,14 @@ export default function BookWizard({
                         {d.avatar || d.name.charAt(0)}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-bold truncate">{d.name}</p>
+                        <p className="text-sm font-bold truncate flex items-center gap-1.5">
+                          {d.name}
+                          {d.isPremium && (
+                            <span className="shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-gradient-to-r from-amber-500 to-yellow-400 text-white">
+                              ★ PREMIUM
+                            </span>
+                          )}
+                        </p>
                         <p className="text-[11px] text-sky-500 font-semibold truncate">{d.specialty}</p>
                       </div>
                       {selected && <CheckCircle size={18} className="ml-auto shrink-0 text-sky-500" />}

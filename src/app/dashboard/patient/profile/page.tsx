@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { usePatientTheme } from "@/components/patient/PatientThemeContext";
+import SubscribeCard from "@/components/premium/SubscribeCard";
 
 // ======================================================
 // TYPES
@@ -524,6 +525,8 @@ export default function PatientProfilePage() {
                   </motion.div>
                 )}
               </AnimatePresence>
+
+              <SubscribeCard isDark={isDark} lang="en" />
 
               {/* Profile Details Card */}
               <motion.div

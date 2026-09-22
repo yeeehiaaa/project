@@ -10,6 +10,7 @@ import {
   Award,
   CheckCircle2,
 } from "lucide-react";
+import SubscribeCard from "@/components/premium/SubscribeCard";
 
 interface DoctorProfileViewProps {
   doctorInfo: {
@@ -34,6 +35,7 @@ export default function DoctorProfileView({
 }: DoctorProfileViewProps) {
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
+      <SubscribeCard isDark={isDark} />
       {/* Profile Card Banner */}
       <div
         className={`p-6 sm:p-8 rounded-3xl border shadow-lg transition-colors relative overflow-hidden ${

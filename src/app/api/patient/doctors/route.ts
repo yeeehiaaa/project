@@ -118,8 +118,25 @@ export async function GET(request: Request) {
     });
 
     /* =====================================================
-       4. FORMAT FOR FRONTEND
+       4. FORMAT FOR FRONTEND (+ mise en avant Premium)
     ===================================================== */
+
+    let premiumProfileIds = new Set<string>();
+    try {
+      const subs = (await (prisma as any).subscription.findMany({})) || [];
+      const now = Date.now();
+      for (const s of subs) {
+        if (
+          s.plan === "PREMIUM" &&
+          s.status === "ACTIVE" &&
+          (!s.expiresAt || new Date(s.expiresAt).getTime() > now)
+        ) {
+          premiumProfileIds.add(String(s.profileId));
+        }
+      }
+    } catch {
+      premiumProfileIds = new Set<string>();
+    }
 
     const formattedDoctors = doctors.map(
       (doctor) => {
@@ -175,8 +192,16 @@ export async function GET(request: Request) {
           avatar:
             doctor.profile.avatarUrl ||
             initials,
+
+          isPremium: premiumProfileIds.has(String(doctor.profileId)),
         };
       }
+    );
+
+    // Premium d'abord, puis note.
+    formattedDoctors.sort(
+      (a, b) =>
+        Number(b.isPremium) - Number(a.isPremium) || b.rating - a.rating
     );
 
     /* =====================================================

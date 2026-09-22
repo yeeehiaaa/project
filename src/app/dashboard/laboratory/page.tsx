@@ -18,10 +18,12 @@ import {
   Search,
   FileText,
   Loader2,
+  Crown,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import DoctorzBrand from "@/components/brand/DoctorzBrand";
 import { PButton, PIconButton } from "@/components/patient/buttons";
+import SubscribeCard from "@/components/premium/SubscribeCard";
 
 interface Facility {
   id: string;
@@ -76,7 +78,7 @@ export default function LaboratoryDashboard() {
   const [facility, setFacility] = useState<Facility | null>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState("");
-  const [tab, setTab] = useState<"products" | "stats">("products");
+  const [tab, setTab] = useState<"products" | "stats" | "premium">("products");
 
   const [products, setProducts] = useState<LabProduct[]>([]);
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
@@ -263,7 +265,13 @@ export default function LaboratoryDashboard() {
         });
       }
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) throw new Error(data.error || "Enregistrement impossible.");
+      if (!res.ok || !data.success) {
+        throw new Error(
+          data.error === "PAYWALL" && data.message
+            ? `${data.message} (voir l'onglet Premium)`
+            : data.error || "Enregistrement impossible."
+        );
+      }
       setForm(EMPTY_FORM);
       setShowForm(false);
       await refreshData();
@@ -462,6 +470,10 @@ export default function LaboratoryDashboard() {
               <PButton variant={tab === "stats" ? "primary" : "secondary"} isDark={false} onClick={() => setTab("stats")}>
                 <Eye size={15} />
                 <span>Portée ({totalViews} vues)</span>
+              </PButton>
+              <PButton variant={tab === "premium" ? "primary" : "secondary"} isDark={false} onClick={() => setTab("premium")}>
+                <Crown size={15} />
+                <span>Premium</span>
               </PButton>
               <span className="flex-1" />
               <PIconButton title="Actualiser" isDark={false} disabled={refreshing} onClick={refreshData}>
@@ -668,6 +680,10 @@ export default function LaboratoryDashboard() {
                   )}
                 </div>
               </div>
+            )}
+
+            {tab === "premium" && (
+              <SubscribeCard isDark={false} />
             )}
           </>
         )}
