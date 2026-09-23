@@ -83,10 +83,13 @@ const KINDS = [
   { id: "EVENT", label: "Événements" },
 ];
 
-function kindLabel(k: string): string {
-  const found = KINDS.find((x) => x.id === k);
-  return found ? found.label.replace(/s$/, "") : k;
-}
+const COMPOSER_KINDS = [
+  { id: "POST", label: "Publication" },
+  { id: "CASE", label: "Cas clinique" },
+  { id: "QUESTION", label: "Question" },
+  { id: "POLL", label: "Sondage" },
+  { id: "EVENT", label: "Événement" },
+];
 
 function timeAgo(iso: string): string {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -911,14 +914,14 @@ export default function DoctorCommunity({
       {showComposer && (
         <div className={`p-5 rounded-3xl border ${box}`}>
           <div className="flex gap-1.5 flex-wrap">
-            {["POST", "CASE", "QUESTION", "POLL", "EVENT"].map((k) => (
+            {COMPOSER_KINDS.map((k) => (
               <button
-                key={k}
+                key={k.id}
                 type="button"
-                onClick={() => setCKind(k)}
-                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition cursor-pointer ${cKind === k ? "bg-violet-600 text-white" : isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"}`}
+                onClick={() => setCKind(k.id)}
+                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition cursor-pointer ${cKind === k.id ? "bg-violet-600 text-white" : isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"}`}
               >
-                {kindLabel(k) === "Post" ? "Publication" : kindLabel(k) === "Poll" ? "Sondage" : kindLabel(k) === "Event" ? "Événement" : kindLabel(k) === "Case" ? "Cas clinique" : "Question"}
+                {k.label}
               </button>
             ))}
           </div>
