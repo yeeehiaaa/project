@@ -122,6 +122,42 @@ export async function POST(request: NextRequest) {
       );
     }
     await notifyMentioned(cleanIds(body.mentionedDoctorIds), postId, doc.doctorId);
+    // Réponses : notifie l'auteur du post + l'auteur du commentaire parent.
+    try {
+      const posts = (await (prisma as any).doctorPost.findMany({})) || [];
+      const post = posts.find((p: any) => p.id === postId);
+      const targets = new Set<string>();
+      if (post && post.doctorId !== doc.doctorId) targets.add(post.doctorId);
+      if (body.parentId) {
+        const all = (await (prisma as any).postComment.findMany({})) || [];
+        const parent = all.find((c: any) => c.id === body.parentId);
+        if (parent && parent.doctorId !== doc.doctorId) targets.add(parent.doctorId);
+      }
+      if (targets.size > 0) {
+        const notifs = (await (prisma as any).doctorNotification.findMany({})) || [];
+        for (const target of targets) {
+          const dup = notifs.some(
+            (n: any) => n.doctorId === target && n.postId === postId && !n.read
+          );
+          if (dup) continue;
+          try {
+            await (prisma as any).doctorNotification.create({
+              data: { doctorId: target, productId: null, postId, read: false },
+            });
+          } catch {
+            // ignore
+          }
+        }
+        const { sendPushToDoctors } = await import("@/lib/push");
+        await sendPushToDoctors(Array.from(targets), {
+          title: "Nouvelle réponse 💬",
+          body: String(post?.title || post?.text || "Discussion").slice(0, 100),
+          url: "/dashboard/doctor",
+        });
+      }
+    } catch {
+      // ignore
+    }
     return NextResponse.json({ success: true, comment: created }, { status: 201 });
   } catch (error) {
     console.error("POST /api/community/comments error:", error);

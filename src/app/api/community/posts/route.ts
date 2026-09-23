@@ -4,7 +4,12 @@ import { resolveDoctorWithSpecialties } from "@/lib/lab-auth";
 import { resolveAuth } from "@/lib/pharmacy-auth";
 import { authorMap, notifyMentioned, cleanIds } from "@/lib/community";
 
-const KINDS = ["POST", "CASE", "QUESTION", "POLL", "EVENT"];
+const KINDS = ["POST", "CASE", "QUESTION", "POLL", "EVENT", "LIBRARY"];
+
+export function extractHashtags(text: string): string[] {
+  const found = String(text || "").match(/#[\p{L}0-9_-]+/gu) || [];
+  return Array.from(new Set(found.map((t) => t.toLowerCase()))).slice(0, 10);
+}
 
 // ============================================================
 // GET — fil communauté (médecins uniquement, masqués exclus)
@@ -32,6 +37,8 @@ export async function GET(request: NextRequest) {
     const specialty = searchParams.get("specialty") || "";
     const mine = searchParams.get("mine") === "1";
     const saved = searchParams.get("saved") === "1";
+    const following = searchParams.get("following") === "1";
+    const tag = (searchParams.get("tag") || "").trim().toLowerCase();
     const postId = searchParams.get("postId") || "";
     const sort = searchParams.get("sort") === "top" ? "top" : "recent";
 
@@ -63,6 +70,22 @@ export async function GET(request: NextRequest) {
     if (postId) list = list.filter((p: any) => p.id === postId);
     if (mine) list = list.filter((p: any) => p.doctorId === doc.doctorId);
     if (saved) list = list.filter((p: any) => savedIds.has(p.id));
+    if (following) {
+      try {
+        const follows = (await (prisma as any).doctorFollow.findMany({})) || [];
+        const ids = new Set(
+          follows.filter((f: any) => f.followerId === doc.doctorId).map((f: any) => f.followedId)
+        );
+        list = list.filter((p: any) => ids.has(p.doctorId));
+      } catch {
+        list = [];
+      }
+    }
+    if (tag) {
+      list = list.filter((p: any) =>
+        ((p.hashtags || []).map(String) || []).map((t: string) => t.toLowerCase()).includes(tag.startsWith("#") ? tag : `#${tag}`)
+      );
+    }
     if (kind) list = list.filter((p: any) => p.kind === kind);
     if (specialty) {
       list = list.filter((p: any) => {
@@ -94,6 +117,9 @@ export async function GET(request: NextRequest) {
           text: p.text,
           mediaPath: p.mediaPath,
           mediaType: p.mediaType,
+          mediaPaths: p.mediaPaths || [],
+          hashtags: p.hashtags || [],
+          pollDeadline: p.pollDeadline || null,
           specialtyIds: p.specialtyIds || [],
           targetNames: (p.specialtyIds || []).length
             ? (p.specialtyIds || []).map((id: string) => specNames.get(String(id)) || "Spécialité")
@@ -243,6 +269,17 @@ export async function POST(request: NextRequest) {
       }
       pollOptions = opts.map((t: string, i: number) => ({ id: `o${i + 1}`, text: t.slice(0, 120) }));
     }
+    let pollDeadline: Date | null = null;
+    if (kind === "POLL" && body.pollDeadline) {
+      const d = new Date(body.pollDeadline);
+      if (!isNaN(d.getTime()) && d.getTime() > Date.now()) pollDeadline = d;
+    }
+    const mediaPaths = Array.isArray(body.mediaPaths)
+      ? body.mediaPaths
+          .map((m: any) => String(m?.path || m || "").trim())
+          .filter((s: string) => s.startsWith("community/"))
+          .slice(0, 4)
+      : [];
     let eventDate: Date | null = null;
     if (kind === "EVENT") {
       if (!body.eventDate) {
@@ -264,7 +301,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: "Invalid media." }, { status: 400 });
       }
       mediaPath = mp.slice(0, 300);
-      mediaType = body.mediaType === "video" ? "video" : "image";
+      mediaType = body.mediaType === "video" ? "video" : body.mediaType === "doc" ? "doc" : "image";
     }
     let created: any = null;
     try {
@@ -276,8 +313,11 @@ export async function POST(request: NextRequest) {
           text: text.slice(0, 5000),
           mediaPath,
           mediaType,
+          mediaPaths,
+          hashtags: extractHashtags(`${body.title || ""} ${text}`),
           specialtyIds: cleanIds(body.specialtyIds),
           pollOptions,
+          pollDeadline,
           eventDate,
           eventPlace: String(body.eventPlace || "").trim().slice(0, 160) || null,
         },

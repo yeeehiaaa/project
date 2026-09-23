@@ -307,8 +307,7 @@ export default function DoctorMessengerView({
     if (currentDoctorId) {
       setResolvedDoctorId(currentDoctorId);
       return;
-    }
-    // Fallback: match by display name in known doctors
+    }    // Fallback: match by display name in known doctors
     const match =
       ALL_REGISTERED_DOCTORS.find((d) => d.name === currentDoctorName) ||
       null;
@@ -332,6 +331,25 @@ export default function DoctorMessengerView({
   const [selectedConvId, setSelectedConvId] = useState<string>(() => {
     return conversations[0]?.id || "";
   });
+
+  // Deep-link : ouvrir une discussion précise (depuis un profil confrère).
+  useEffect(() => {
+    try {
+      const convId = sessionStorage.getItem("doctor-open-conv");
+      if (convId) {
+        setSelectedConvId(convId);
+        sessionStorage.removeItem("doctor-open-conv");
+      }
+    } catch {
+      // ignore
+    }
+    const handler = (e: Event) => {
+      const convId = (e as CustomEvent).detail?.convId;
+      if (convId) setSelectedConvId(String(convId));
+    };
+    window.addEventListener("doctor-messenger-open", handler);
+    return () => window.removeEventListener("doctor-messenger-open", handler);
+  }, []);
 
   const [activeFilter, setActiveFilter] = useState<
     "ALL" | "PATIENTS" | "COLLEAGUES" | "GROUPS"

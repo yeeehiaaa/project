@@ -778,6 +778,16 @@ export default function DoctorDashboard() {
   // Initial load
   useEffect(() => {
     loadDoctorDashboard();
+    // Deep-link (profil confrère → messagerie) : restaure l'onglet demandé.
+    try {
+      const tab = sessionStorage.getItem("doctor-open-tab");
+      if (tab === "messenger" || tab === "community") {
+        setActiveTab(tab);
+        sessionStorage.removeItem("doctor-open-tab");
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
   // Filtered appointments

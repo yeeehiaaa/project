@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, FlaskConical, MessageSquare } from "lucide-react";
+import { Bell, FlaskConical, MessageSquare, Stethoscope } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 interface LabNotifProduct {
@@ -28,6 +28,7 @@ interface LabNotif {
   product?: LabNotifProduct;
   postId?: string;
   post?: LabNotifPost | null;
+  teleExpertiseId?: string;
 }
 
 // Cloche "Nouveautés laboratoires" : un clic sur un médicament
@@ -103,6 +104,16 @@ export default function DoctorLabNotifs({ isDark }: { isDark: boolean }) {
       // ignore
     }
     setOpen(false);
+    // Demande d'avis → onglet Communauté, section Expertises.
+    if (n.teleExpertiseId) {
+      try {
+        sessionStorage.setItem("doctor-community-section", "expertises");
+      } catch {
+        // ignore
+      }
+      window.dispatchEvent(new CustomEvent("doctor-community-open", { detail: {} }));
+      return;
+    }
     // Mention communauté → onglet Communauté + surlignage du post.
     if (n.postId) {
       window.dispatchEvent(
@@ -161,7 +172,23 @@ export default function DoctorLabNotifs({ isDark }: { isDark: boolean }) {
                 </p>
               ) : (
                 notifs.map((n) =>
-                  n.postId ? (
+                  n.teleExpertiseId ? (
+                    <button
+                      key={n.id}
+                      type="button"
+                      onClick={() => openNotif(n)}
+                      className={`w-full text-left px-4 py-3 border-b transition cursor-pointer ${isDark ? "border-slate-800 hover:bg-slate-800/60" : "border-slate-100 hover:bg-slate-50"} ${!n.read ? (isDark ? "bg-emerald-500/5" : "bg-emerald-50/60") : ""}`}
+                    >
+                      <p className="text-xs font-bold flex items-center gap-1.5">
+                        {!n.read && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />}
+                        <Stethoscope size={11} className="text-emerald-500 shrink-0" />
+                        <span className="truncate">Demande d'avis médical</span>
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-slate-400 truncate">
+                        Un confrère sollicite votre expertise
+                      </p>
+                    </button>
+                  ) : n.postId ? (
                     <button
                       key={n.id}
                       type="button"

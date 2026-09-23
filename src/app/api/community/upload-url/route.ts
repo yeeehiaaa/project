@@ -18,6 +18,7 @@ function serviceClient() {
 const ALLOWED: Record<string, string[]> = {
   image: ["image/jpeg", "image/png", "image/webp", "image/gif"],
   video: ["video/mp4", "video/webm", "video/quicktime"],
+  doc: ["application/pdf"],
 };
 
 function extOf(mime: string): string {
@@ -29,6 +30,7 @@ function extOf(mime: string): string {
     "video/mp4": "mp4",
     "video/webm": "webm",
     "video/quicktime": "mov",
+    "application/pdf": "pdf",
   };
   return map[mime] || "bin";
 }
@@ -61,10 +63,12 @@ export async function POST(request: NextRequest) {
       ? "image"
       : ALLOWED.video.includes(mime)
         ? "video"
-        : null;
+        : ALLOWED.doc.includes(mime)
+          ? "doc"
+          : null;
     if (!mediaType) {
       return NextResponse.json(
-        { success: false, error: "Image (JPG/PNG/WEBP/GIF) ou vidéo (MP4/WEBM) uniquement." },
+        { success: false, error: "Image, vidéo ou PDF uniquement." },
         { status: 400 }
       );
     }

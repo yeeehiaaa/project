@@ -23,6 +23,8 @@ export async function authorMap() {
       id: d.id,
       name: prof ? `Dr. ${prof.firstName || ""} ${prof.lastName || ""}`.trim() : "Médecin",
       specialtyNames: sIds.map((id: string) => specNames.get(id)).filter(Boolean),
+      verified: !!prof?.isVerified,
+      yearsExperience: d.yearsExperience ?? null,
     });
   }
   return { map, specNames };
@@ -52,6 +54,19 @@ export async function notifyMentioned(
       } catch {
         // ignore
       }
+    }
+    // Push navigateur (fire-and-forget).
+    try {
+      const posts = (await (prisma as any).doctorPost.findMany({})) || [];
+      const post = posts.find((p: any) => p.id === postId);
+      const { sendPushToDoctors } = await import("@/lib/push");
+      await sendPushToDoctors(targets, {
+        title: "On vous a mentionné 👨‍⚕️",
+        body: post?.title || String(post?.text || "Nouvelle mention").slice(0, 100),
+        url: "/dashboard/doctor",
+      });
+    } catch {
+      // ignore
     }
   } catch {
     // ignore

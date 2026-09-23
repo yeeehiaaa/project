@@ -44,6 +44,10 @@ export async function GET(request: NextRequest) {
     const specNames = new Map(specialties.map((s: any) => [String(s.id), s.name]));
     const enriched = notifs
       .map((n: any) => {
+        // Demande d'avis (télé-expertise) : renvoie vers l'onglet expertises.
+        if (n.teleExpertiseId) {
+          return { id: n.id, read: n.read, createdAt: n.createdAt, teleExpertiseId: n.teleExpertiseId, postId: n.postId || null };
+        }
         // Mention communauté (@) : renvoie vers le post.
         if (n.postId) return { id: n.id, read: n.read, createdAt: n.createdAt, postId: n.postId };
         const p = products.find((x: any) => x.id === n.productId);

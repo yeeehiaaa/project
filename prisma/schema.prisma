@@ -436,12 +436,13 @@ model LabProduct {
 }
 
 model DoctorNotification {
-  id        String   @id @default(uuid())
-  doctorId  String
-  productId String?
-  postId    String?
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id              String   @id @default(uuid())
+  doctorId        String
+  productId       String?
+  postId          String?
+  teleExpertiseId String?
+  read            Boolean  @default(false)
+  createdAt       DateTime @default(now())
 
   @@index([doctorId])
   @@index([productId])
@@ -469,7 +470,10 @@ model DoctorPost {
   mediaPath    String?
   mediaType    String?
   specialtyIds String[] @default([])
+  hashtags     String[] @default([])
+  mediaPaths   String[] @default([])
   pollOptions  Json?
+  pollDeadline DateTime?
   eventDate    DateTime?
   eventPlace   String?
   outcome      String?
@@ -564,6 +568,117 @@ model CommentVote {
   @@id([commentId, doctorId])
   @@index([commentId])
   @@index([postId])
+}
+
+// ============================================================
+// COMMUNAUTÉ v3 : hashtags, sondages à deadline, protocoles,
+// quiz, suivi, stories, expertise, push navigateur.
+// ============================================================
+
+model DoctorFollow {
+  followerId String
+  followedId String
+  createdAt  DateTime @default(now())
+
+  @@id([followerId, followedId])
+  @@index([followerId])
+  @@index([followedId])
+}
+
+model Protocol {
+  id           String   @id @default(uuid())
+  doctorId     String
+  title        String
+  specialtyId  String?
+  content      String
+  filePath     String?
+  version      Int      @default(1)
+  validated    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([specialtyId])
+}
+
+model ProtocolConfirm {
+  protocolId String
+  doctorId   String
+  createdAt  DateTime @default(now())
+
+  @@id([protocolId, doctorId])
+  @@index([protocolId])
+}
+
+model Quiz {
+  id           String   @id @default(uuid())
+  doctorId     String
+  title        String
+  specialtyIds String[] @default([])
+  createdAt    DateTime @default(now())
+
+  @@index([doctorId])
+}
+
+model QuizQuestion {
+  id        String @id @default(uuid())
+  quizId    String
+  text      String
+  options   Json
+  correct   Int
+  createdAt DateTime @default(now())
+
+  @@index([quizId])
+}
+
+model QuizAttempt {
+  id        String   @id @default(uuid())
+  quizId    String
+  doctorId  String
+  score     Int
+  total     Int
+  createdAt DateTime @default(now())
+
+  @@index([quizId])
+  @@index([doctorId])
+}
+
+model Story {
+  id        String   @id @default(uuid())
+  doctorId  String
+  text      String?
+  mediaPath String?
+  mediaType String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([doctorId])
+  @@index([expiresAt])
+}
+
+model TeleExpertise {
+  id           String   @id @default(uuid())
+  postId       String?
+  fromDoctorId String
+  toDoctorId   String
+  question     String
+  answer       String?
+  status       String   @default("PENDING")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([toDoctorId])
+  @@index([fromDoctorId])
+}
+
+model PushSubscription {
+  id         String   @id @default(uuid())
+  doctorId   String
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  createdAt  DateTime @default(now())
+
+  @@index([doctorId])
 }
 
 model Subscription {

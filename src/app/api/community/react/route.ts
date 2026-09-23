@@ -179,6 +179,19 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+      // Sondage clôturé (deadline) : résultat figé.
+      try {
+        const allPosts = (await (prisma as any).doctorPost.findMany({})) || [];
+        const post = allPosts.find((p: any) => p.id === postId);
+        if (post?.pollDeadline && new Date(post.pollDeadline).getTime() <= Date.now()) {
+          return NextResponse.json(
+            { success: false, error: "Sondage clôturé." },
+            { status: 400 }
+          );
+        }
+      } catch {
+        // ignore
+      }
       try {
         const all = (await (prisma as any).pollVote.findMany({})) || [];
         const mine = all.find((v: any) => v.postId === postId && v.doctorId === doc.doctorId);
